@@ -1,16 +1,10 @@
+#include "http_client.hpp"
+
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <string>
-#include <nvs_flash.h>
-#include <esp_event.h>
-
-#include "http_client.hpp"
-#include "../components/wifi/wifi.hpp"
 
 static const char* TAG = "esp_miser";
-
-WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
 void test_http_task_oneshot(void* param) {
   EspHttpClient::Config Cfg {};
@@ -21,7 +15,7 @@ void test_http_task_oneshot(void* param) {
   EspHttpClient client(Cfg);
 
   // --- Request 1: GET ---
-  esp_err_t err = client.get("http://duckduckgo.com");
+  esp_err_t err = client.get("http://api.example.com/data");
   if (err == ESP_OK) {
     int status = client.check_status_code();
     std::string body;
@@ -31,12 +25,12 @@ void test_http_task_oneshot(void* param) {
 
   // --- Request 2: POST (Reusing same client) ---
   // Note: With the reset_request_state fix, headers from GET won't leak here.
-  // std::string payload = "{\"key\": \"value\"}";
-  // err = client.post("http://api.example.com/update", payload);
-  // if (err == ESP_OK) {
-  //   int status = client.check_status_code();
-  //   ESP_LOGI("TASK", "POST Status: %d", status);
-  // }
+  std::string payload = "{\"key\": \"value\"}";
+  err = client.post("http://api.example.com/update", payload);
+  if (err == ESP_OK) {
+    int status = client.check_status_code();
+    ESP_LOGI("TASK", "POST Status: %d", status);
+  }
 
   // Destructor runs client_clean() automatically
   vTaskDelete(NULL);
@@ -44,12 +38,5 @@ void test_http_task_oneshot(void* param) {
 
 extern "C" void app_main(void) {
 
-  ESP_ERROR_CHECK(g_wifihandler.wifi_init());
-  ESP_ERROR_CHECK(g_wifihandler.wifi_connect());
-
-  ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
-
-  test_http_task_oneshot(NULL);
-
-  ESP_LOGI(TAG, "hello");
+  ESP_LOGI(TAG, "hello\n");
 }

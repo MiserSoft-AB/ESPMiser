@@ -1,4 +1,5 @@
 idf_component_register(SRCS "esp_miser.cpp"
   INCLUDE_DIRS "."
-  PRIV_REQUIRES http_client
+  REQUIRES nvs_flash
+  PRIV_REQUIRES http_client wifi
 )
