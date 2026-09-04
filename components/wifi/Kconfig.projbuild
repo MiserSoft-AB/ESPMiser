@@ -1,0 +1,13 @@
+menu "Wifi Credentials"
+
+    config WIFI_CREDENTIAL_SSID
+        string "SSID"
+        help
+            SSID of target WiFi network.
+
+    config WIFI_CREDENTIAL_PASSPHRASE
+        string "Passphrase"
+        help
+            Passphrase of target WiFi network.
+
+endmenu

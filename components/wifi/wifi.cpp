@@ -1,13 +1,14 @@
 #include "wifi.hpp"
 #include "esp_wifi.h"
+#include "sdkconfig.h"
 
 static const char* TAG = "WIFIHANDLER";
 
 esp_err_t WifiHandler::wifi_init() {
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = SSID,
-            .password = PASSPHRASE,
+            .ssid = CONFIG_WIFI_CREDENTIAL_SSID,
+            .password = CONFIG_WIFI_CREDENTIAL_PASSPHRASE,
         },
     };
 

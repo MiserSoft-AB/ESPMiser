@@ -7,8 +7,7 @@
 #include <esp_wifi_types_generic.h>
 #include <string>
 
-#define SSID ""
-#define PASSPHRASE ""
+#include <sdkconfig.h>
 
 class WifiHandler {
     private:
