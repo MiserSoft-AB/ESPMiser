@@ -4,9 +4,9 @@ ESPMiser is an ESP-IDF project for an ESP32-S3-based terminal that will display 
 
 ## Prerequisites
 
-- ESP-IDF v6.1 (tested)
+- ESP-IDF v6.1 or 5.5.4 (tested) 
 - Git
-- An ESP32-S3 development board
+- An ESP32-S3 from [Waveshare](https://www.amazon.se/Waveshare-ESP32-S3-Development-Resolution-Dual-Core/dp/B0FDQXKFJ5)
 - A USB data cable
 
 ## Configuration
