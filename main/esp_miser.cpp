@@ -1,3 +1,6 @@
+#include "http_client.hpp"
+#include "wifi.hpp"
+
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -5,8 +8,7 @@
 #include <nvs_flash.h>
 #include <esp_event.h>
 
-#include "http_client.hpp"
-#include "../components/wifi/wifi.hpp"
+
 
 static const char* TAG = "esp_miser";
 
@@ -42,7 +44,12 @@ void test_http_task_oneshot(void* param) {
   vTaskDelete(NULL);
 }
 
+
+
 extern "C" void app_main(void) {
+  ESP_ERROR_CHECK(nvs_flash_init());
+  ESP_ERROR_CHECK(esp_netif_init());
+  ESP_ERROR_CHECK(esp_event_loop_create_default());
 
   ESP_ERROR_CHECK(g_wifihandler.wifi_init());
   ESP_ERROR_CHECK(g_wifihandler.wifi_connect());
