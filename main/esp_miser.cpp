@@ -15,7 +15,9 @@ static const char* TAG = "esp_miser";
 
 WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
-void test_http_task_oneshot(void* param) {
+void test_http_task_oneshot(void* param) 
+{
+  // Create client config
   EspHttpClient::Config Cfg {};
   Cfg.timeout_ms = 3000;
   Cfg.response_body_max_len = 4096;
@@ -26,7 +28,8 @@ void test_http_task_oneshot(void* param) {
   {
     // --- Request 1: GET ---
     esp_err_t err = client.get("http://httpforever.com");
-    if (err == ESP_OK) {
+    if (err == ESP_OK) 
+    {
       int status = client.check_status_code();
       std::string body;
       client.read_body(body);
@@ -48,9 +51,8 @@ void test_http_task_oneshot(void* param) {
   }
 }
 
-
-
-extern "C" void app_main(void) {
+extern "C" void app_main(void)
+{
   esp_err_t res;
 
   ESP_ERROR_CHECK(nvs_flash_init());
@@ -65,13 +67,15 @@ extern "C" void app_main(void) {
     ESP_LOGE(TAG, "Failed to init wifi, res: %s", esp_err_to_name(res)); 
   }
 
+  g_wifihandler.wifi_connect();
+
   // Blocks until we have an IP or die
-  res = g_wifihandler.wifi_wait_for_connect();
-  ESP_ERROR_CHECK(res);
-  if (res != ESP_OK)
-  {
-    ESP_LOGE(TAG, "Failed to connect wifi try again, res: %s", esp_err_to_name(res));
-  }
+  // res = g_wifihandler.wifi_wait_for_connect();
+  // ESP_ERROR_CHECK(res);
+  // if (res != ESP_OK)
+  // {
+  //   ESP_LOGE(TAG, "Failed to connect wifi try again, res: %s", esp_err_to_name(res));
+  // }
 
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
 
