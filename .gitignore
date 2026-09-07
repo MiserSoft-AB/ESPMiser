@@ -52,6 +52,9 @@ Makefile
 install_manifest.txt
 compile_commands.json
 
+# CLang generated files
+.clangd
+
 # Temporary files
 *.tmp
 *.log
@@ -67,3 +70,6 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+.vscode
+sdkconfig
+sdkconfig.old
