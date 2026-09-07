@@ -16,7 +16,7 @@ static const char* TAG = "esp_miser";
 
 WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
-void test_http_task_oneshot(void* parameter) 
+void network_task (void* parameter) 
 {
   // Create client config
   EspHttpClient::Config Cfg {};
@@ -86,7 +86,7 @@ extern "C" void app_main(void)
     8192,           // stack size for the task in ESP-IDF
     nullptr,        // parameter to pass to the task, for example could be &config
     5,              // task priority
-    nullptr         // optional task handle
+  nullptr         // optional task handle
   );
 
   if (task_result != pdPASS)
