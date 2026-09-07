@@ -67,19 +67,16 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to init wifi, res: %s", esp_err_to_name(res)); 
   }
 
-  g_wifihandler.wifi_connect();
-
   // Blocks until we have an IP or die
-  // res = g_wifihandler.wifi_wait_for_connect();
-  // ESP_ERROR_CHECK(res);
-  // if (res != ESP_OK)
-  // {
-  //   ESP_LOGE(TAG, "Failed to connect wifi try again, res: %s", esp_err_to_name(res));
-  // }
+  res = g_wifihandler.wifi_wait_for_connect();
+  ESP_ERROR_CHECK(res);
+  if (res != ESP_OK)
+  {
+    ESP_LOGE(TAG, "Failed to connect wifi try again, res: %s", esp_err_to_name(res));
+  }
 
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
 
   test_http_task_oneshot(NULL);
 
-  ESP_LOGI(TAG, "hello");
 }
