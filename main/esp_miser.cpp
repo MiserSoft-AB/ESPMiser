@@ -1,6 +1,7 @@
 #include "esp_err.h"
 #include "freertos/projdefs.h"
 #include "http_client.hpp"
+#include "portmacro.h"
 #include "wifi.hpp"
 
 #include <esp_log.h>
@@ -15,7 +16,7 @@ static const char* TAG = "esp_miser";
 
 WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
-void test_http_task_oneshot(void* param) 
+void test_http_task_oneshot(void* parameter) 
 {
   // Create client config
   EspHttpClient::Config Cfg {};
@@ -79,7 +80,19 @@ extern "C" void app_main(void)
 
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
 
-  test_http_task_oneshot(NULL);
+  BaseType_t task_result = xTaskCreate(
+    network_task,   //the function freertos should execute as a task
+    "network_task", // name for debugging
+    8192,           // stack size for the task in ESP-IDF
+    nullptr,        // parameter to pass to the task, for example &config could be passed here
+    5,              // priority of the task
+    nullptr         // optional task handle
+  );
+
+  if (task_result != pdPASS)
+  {
+    ESP_LOGE(TAG, "Failed to create network task");
+  }
 
   ESP_LOGI(TAG, "hello");
 }
