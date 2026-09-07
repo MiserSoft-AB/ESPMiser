@@ -84,8 +84,8 @@ extern "C" void app_main(void)
     network_task,   //the function freertos should execute as a task
     "network_task", // name for debugging
     8192,           // stack size for the task in ESP-IDF
-    nullptr,        // parameter to pass to the task, for example &config could be passed here
-    5,              // priority of the task
+    nullptr,        // parameter to pass to the task, for example could be &config
+    5,              // task priority
     nullptr         // optional task handle
   );
 
