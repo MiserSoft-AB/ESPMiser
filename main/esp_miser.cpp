@@ -2,6 +2,7 @@
 #include "freertos/projdefs.h"
 #include "http_client.hpp"
 #include "wifi.hpp"
+#include "display.hpp"
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -78,6 +79,20 @@ extern "C" void app_main(void)
   // }
 
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
+
+  BaseType_t display_task_result = xTaskCreate( // Creating a variable to store the result
+    display_task,               //called function
+    "display_task",             //readable name
+    4096,                       //reserved memory
+    nullptr,                    //no data is passed to void* parameter
+    3,                          //priority
+    nullptr                     //do not save a task handle
+  );
+
+  if (display_task_result != pdPASS) //pdPASS = task created successfully
+  {
+    ESP_LOGE(TAG, "Failed to create display task");
+  }
 
   test_http_task_oneshot(NULL);
 
