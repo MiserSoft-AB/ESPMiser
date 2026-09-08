@@ -1,0 +1,16 @@
+{
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "idf.currentSetup": "D:\\esp\\.espressif\\v6.1\\esp-idf",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "clangd.path": "C:\\Espressif\\tools\\esp-clangd\\esp-21.1.3_20260408\\esp-clangd\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=d:\\Projects\\MiserSoft ESP32\\ESPMiser\\ESPMiser\\build"
+  ],
+  "idf.flashType": "UART"
+}
