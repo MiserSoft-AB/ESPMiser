@@ -52,6 +52,29 @@ void network_task (void* parameter)
   }
 }
 
+void sensor_task(void* parameter)
+{
+    (void)parameter;
+
+    float temperature = 22.0f;
+    float humidity = 45.0f;
+    float pressure = 1013.25f;
+
+    while (true)
+    {
+        ESP_LOGI(
+            "sensor_task",
+            "Simulated reading: %.1f C, %.1f %% RH, %.1f hPa",
+            temperature,
+            humidity,
+            pressure
+        );
+
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+
 extern "C" void app_main(void)
 {
   esp_err_t res;
@@ -81,12 +104,12 @@ extern "C" void app_main(void)
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
 
   BaseType_t task_result = xTaskCreate(
-    network_task,   //the function freertos should execute as a task
-    "network_task", // name for debugging
+    network_task,     //the function freertos should execute as a task
+    "network_task",       // name for debugging
     8192,           // stack size for the task in ESP-IDF
     nullptr,        // parameter to pass to the task, for example could be &config
-    5,              // task priority
-  nullptr         // optional task handle
+    5,                // task priority
+  nullptr          // optional task handle
   );
 
   if (task_result != pdPASS)
