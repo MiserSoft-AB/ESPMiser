@@ -117,5 +117,20 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create network task");
   }
 
+  BaseType_t sensor_task_result = xTaskCreate(
+    sensor_task,
+    "sensor_task",
+    4096,
+    nullptr,
+    5,
+    nullptr
+);
+
+if (sensor_task_result != pdPASS)
+{
+    ESP_LOGE(TAG, "Failed to create sensor task");
+}
+
+
   ESP_LOGI(TAG, "hello");
 }
