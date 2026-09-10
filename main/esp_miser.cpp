@@ -2,6 +2,7 @@
 #include "freertos/projdefs.h"
 #include "http_client.hpp"
 #include "portmacro.h"
+#include "tasks/tasks.hpp"
 #include "wifi.hpp"
 
 #include <esp_log.h>
@@ -15,65 +16,6 @@
 static const char* TAG = "esp_miser";
 
 WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
-
-void network_task (void* parameter) 
-{
-  // Create client config
-  EspHttpClient::Config Cfg {};
-  Cfg.timeout_ms = 3000;
-  Cfg.response_body_max_len = 4096;
-
-  // Create client
-  EspHttpClient client(Cfg);
-  while (true)
-  {
-    // --- Request 1: GET ---
-    esp_err_t err = client.get("http://httpforever.com");
-    if (err == ESP_OK) 
-    {
-      int status = client.check_status_code();
-      std::string body;
-      client.read_body(body);
-      ESP_LOGI("http_task", "GET Status: %d, Body: %s", status, body.c_str());
-    }
-
-    // --- Request 2: POST (Reusing same client) ---
-    // Note: With the reset_request_state fix, headers from GET won't leak here.
-    // std::string payload = "{\"key\": \"value\"}";
-    // err = client.post("http://api.example.com/update", payload);
-    // if (err == ESP_OK) {
-    //   int status = client.check_status_code();
-    //   ESP_LOGI("TASK", "POST Status: %d", status);
-    // }
-
-    // Destructor runs client_clean() automatically
-    // vTaskDelete(NULL);
-    vTaskDelay(pdMS_TO_TICKS(5000));
-  }
-}
-
-void sensor_task(void* parameter)
-{
-    (void)parameter;
-
-    float temperature = 22.0f;
-    float humidity = 45.0f;
-    float pressure = 1013.25f;
-
-    while (true)
-    {
-        ESP_LOGI(
-            "sensor_task",
-            "Simulated reading: %.1f C, %.1f %% RH, %.1f hPa",
-            temperature,
-            humidity,
-            pressure
-        );
-
-        vTaskDelay(pdMS_TO_TICKS(2000));
-    }
-}
-
 
 extern "C" void app_main(void)
 {
