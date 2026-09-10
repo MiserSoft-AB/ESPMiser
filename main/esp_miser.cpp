@@ -16,41 +16,6 @@ static const char* TAG = "esp_miser";
 
 WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
-void network_task (void* parameter) 
-{
-  // Create client config
-  EspHttpClient::Config Cfg {};
-  Cfg.timeout_ms = 3000;
-  Cfg.response_body_max_len = 4096;
-
-  // Create client
-  EspHttpClient client(Cfg);
-  while (true)
-  {
-    // --- Request 1: GET ---
-    esp_err_t err = client.get("http://httpforever.com");
-    if (err == ESP_OK) 
-    {
-      int status = client.check_status_code();
-      std::string body;
-      client.read_body(body);
-      ESP_LOGI("http_task", "GET Status: %d, Body: %s", status, body.c_str());
-    }
-
-    // --- Request 2: POST (Reusing same client) ---
-    // Note: With the reset_request_state fix, headers from GET won't leak here.
-    // std::string payload = "{\"key\": \"value\"}";
-    // err = client.post("http://api.example.com/update", payload);
-    // if (err == ESP_OK) {
-    //   int status = client.check_status_code();
-    //   ESP_LOGI("TASK", "POST Status: %d", status);
-    // }
-
-    // Destructor runs client_clean() automatically
-    // vTaskDelete(NULL);
-    vTaskDelay(pdMS_TO_TICKS(5000));
-  }
-}
 
 extern "C" void app_main(void)
 {
@@ -81,12 +46,12 @@ extern "C" void app_main(void)
   ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
 
   BaseType_t task_result = xTaskCreate(
-    network_task,   //the function freertos should execute as a task
+    EspHttpClient::test_fetch_task,   //the function freertos should execute as a task
     "network_task", // name for debugging
     8192,           // stack size for the task in ESP-IDF
     nullptr,        // parameter to pass to the task, for example could be &config
     5,              // task priority
-  nullptr         // optional task handle
+    nullptr         // optional task handle
   );
 
   if (task_result != pdPASS)
