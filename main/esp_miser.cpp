@@ -2,6 +2,7 @@
 #include "freertos/projdefs.h"
 #include "http_client.hpp"
 #include "wifi.hpp"
+#include "task_priorities.hpp"
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
