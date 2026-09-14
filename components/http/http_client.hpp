@@ -3,16 +3,11 @@
 #ifndef __HTTP_CLIENT_HPP__
 #define __HTTP_CLIENT_HPP__
 
-#include <esp_log.h>
-#include <esp_err.h>
 #include <esp_http_client.h>
-
+#include <esp_err.h>
+#include <esp_log.h>
 #include <string>
-#include <vector>
-#include <memory>
-#include <functional>
-#include <stdexcept>
-#include <cstdint>
+
 
 // WARNING: Not thread-safe as-is, need careful handling in tasks
 
@@ -59,6 +54,9 @@ public:
   
   // Inits the esp_http_client with config values
   esp_err_t client_init();
+
+  // Task for running simple fetch
+  static void test_fetch_task (void* parameter);
 
   // Checks HTTP status code
   int check_status_code();
