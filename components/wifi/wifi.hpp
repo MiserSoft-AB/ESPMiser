@@ -21,7 +21,7 @@ class WifiHandler {
         static void on_assigned_ip(void* handler_args, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
     public:
-        WifiHandler(const wifi_init_config_t init_config) : init_config(init_config), wifi_ready(false), IP("None")
+        WifiHandler(const wifi_init_config_t init_config) : init_config(init_config), wifi_ready(false), IP("")
         {
 
         }

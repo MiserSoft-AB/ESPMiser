@@ -37,6 +37,8 @@ void WifiHandler::on_assigned_ip(void* handler_args, esp_event_base_t event_base
         wifihandler->IP = "";
     }
 
+    ESP_LOGI(TAG, "IP: %s", wifihandler->get_ip().c_str());
+
     return;
 }
 
