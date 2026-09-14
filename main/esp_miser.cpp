@@ -1,4 +1,5 @@
 #include "esp_err.h"
+#include "esp_wifi_default.h"
 #include "freertos/projdefs.h"
 #include "http_client.hpp"
 #include "wifi.hpp"
@@ -13,7 +14,7 @@
 
 static const char* TAG = "esp_miser";
 
-WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
+static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
 void test_http_task_oneshot(void* param) 
 {
@@ -58,28 +59,13 @@ extern "C" void app_main(void)
   ESP_ERROR_CHECK(nvs_flash_init());
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
-  esp_netif_create_default_wifi_sta(); // This line is the result of many headbashes
+  esp_netif_create_default_wifi_sta();
 
-  res = g_wifihandler.wifi_init();
-  ESP_ERROR_CHECK(res);
-  if (res == ESP_FAIL)
-  {
-    ESP_LOGE(TAG, "Failed to init wifi, res: %s", esp_err_to_name(res)); 
-  }
+  ESP_ERROR_CHECK(g_wifihandler.wifi_init());
+  //ESP_ERROR_CHECK(g_wifihandler.wifi_connect());
 
-  g_wifihandler.wifi_connect();
-
-  // Blocks until we have an IP or die
-  // res = g_wifihandler.wifi_wait_for_connect();
-  // ESP_ERROR_CHECK(res);
-  // if (res != ESP_OK)
-  // {
-  //   ESP_LOGE(TAG, "Failed to connect wifi try again, res: %s", esp_err_to_name(res));
-  // }
-
-  ESP_LOGI(TAG, "IP: %s", g_wifihandler.get_ip().c_str());
-
-  test_http_task_oneshot(NULL);
+  //test_http_task_oneshot(NULL);
 
   ESP_LOGI(TAG, "hello");
+
 }
