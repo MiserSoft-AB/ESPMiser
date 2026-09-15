@@ -5,6 +5,7 @@
 #include "portmacro.h"
 #include "wifi.hpp"
 #include "sysmon_task.hpp"
+#include "display.hpp"
 
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
@@ -47,6 +48,20 @@ extern "C" void app_main(void)
   if (task_result != pdPASS)
   {
     ESP_LOGE(TAG, "Failed to create network task");
+  }
+
+  BaseType_t display_task_result = xTaskCreate( 
+    display_task,               
+    "display_task",             
+    4096,                       
+    nullptr,                    
+    3,                         
+    nullptr                  
+  );
+
+  if (display_task_result != pdPASS) //pdPASS = task created successfully
+  {
+    ESP_LOGE(TAG, "Failed to create display task");
   }
 
   ESP_LOGI(TAG, "hello");
