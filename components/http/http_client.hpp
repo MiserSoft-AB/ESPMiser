@@ -1,5 +1,3 @@
-#pragma once // in case included multiple places
-
 #ifndef __HTTP_CLIENT_HPP__
 #define __HTTP_CLIENT_HPP__
 
@@ -8,9 +6,8 @@
 #include <esp_log.h>
 #include <string>
 
-
 // WARNING: Not thread-safe as-is, need careful handling in tasks
-
+// TODO: Yeet std:string allocation from task, use static buffer size
 
 class EspHttpClient 
 {
@@ -20,7 +17,7 @@ public:
     // const char* cert_pem; //for https
     int timeout_ms = 5000;
     int event_handler_mask = HTTP_EVENT_ERROR | HTTP_EVENT_ON_DATA;
-    size_t response_body_max_len = 8192;
+    size_t response_body_max_len = 2048;
     const char* def_url = "http://httpforever.com";
     
     // TODO: (maybe) add flow for async functionality
