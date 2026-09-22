@@ -6,6 +6,7 @@
 #include "ui_queue.hpp"
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
+#include "sensors_task.hpp"
 
 #include <portmacro.h>
 #include <esp_err.h>
@@ -75,5 +76,17 @@ extern "C" void app_main(void)
   );
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
+
+  // Start sensors task
+  task_result = xTaskCreate(
+    Sensors::sensors_task_test,
+    "leop_fetcher",
+    4096,
+    nullptr,
+    task_priorities::SENSOR,
+    nullptr
+  );
+  if (task_result != pdPASS) //pdPASS = task created successfully
+    ESP_LOGE(TAG, "Failed to create sensors task");
 
 }

@@ -1,4 +1,5 @@
 #include "leop_fetcher.hpp"
+#include "data.h"
 #include "ui_queue.hpp"
 
 
@@ -13,14 +14,14 @@ static const char* TAG = "leop_fetcher";
 void LeopFetcher::leop_fetch_task_test(void* params) 
 {
   // Local copy of ui data
-  Ui_Data UiD = {
-    .leop_data = {0},
-  };
+  Ui_Data UiD;
+  ui_data_init(&UiD);
 
   while (1) 
   {
     // Mock sending data over queue to ui
     srand(time(NULL));
+    UiD.type = UI_LEOP_DATA;
     UiD.leop_data.price = (float)rand() / RAND_MAX;
     ESP_LOGI(TAG, "Sending %f to queue.", UiD.leop_data.price);
 
