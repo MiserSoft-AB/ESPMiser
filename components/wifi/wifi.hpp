@@ -6,6 +6,7 @@
 #include <esp_log.h>
 #include <esp_wifi_types_generic.h>
 #include <string>
+#include <freertos/semphr.h>
 
 #include <sdkconfig.h>
 
@@ -15,13 +16,18 @@ class WifiHandler {
 
         bool wifi_ready;
         std::string IP;
+        SemaphoreHandle_t mutex_;
 
         static void on_wifi_init_finished(void* handler_args, esp_event_base_t event_base, int32_t event_id, void* event_data);
         static void on_wifi_connected(void* handler_args, esp_event_base_t event_base, int32_t event_id, void* event_data);
         static void on_assigned_ip(void* handler_args, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
     public:
-        WifiHandler(const wifi_init_config_t init_config) : init_config(init_config), wifi_ready(false), IP("")
+        WifiHandler(const wifi_init_config_t init_config) : 
+        init_config(init_config), 
+        wifi_ready(false), 
+        IP(""),
+        mutex_(nullptr)
         {
 
         }

@@ -8,8 +8,18 @@ void WifiHandler::on_wifi_init_finished(void* handler_args, esp_event_base_t eve
     WifiHandler* wifihandler = (WifiHandler*)handler_args;
 
     ESP_LOGI(TAG, "WIFI STARTED SUCCESSFULLY!!"); //DBG
-    wifihandler->wifi_ready = true;
     
+    if(xSemaphoreTake(wifihandler->mutex_, pdMS_TO_TICKS(100)) == pdTRUE)
+    {
+        wifihandler->wifi_ready = true;
+        xSemaphoreGive(wifihandler->mutex_);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "WIFI MUTEX LOCK FAILURE :(");
+        return;
+    }
+
     wifihandler->wifi_connect();
 
     return;
@@ -24,27 +34,48 @@ void WifiHandler::on_wifi_connected(void* handler_args, esp_event_base_t event_b
 }
 
 void WifiHandler::on_assigned_ip(void* handler_args, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-    WifiHandler* wifihandler = (WifiHandler*)handler_args;
+    WifiHandler* wifihandler = static_cast<WifiHandler*>(handler_args);
+    ip_event_got_ip_t* data = static_cast<ip_event_got_ip_t*>(event_data);
+    char ip_buf[16] = {};
     
-    ip_event_got_ip_t* data = (ip_event_got_ip_t*)event_data;
-    ESP_LOGI(TAG, "GOT IP!!"); //DBG
+    std::string new_ip;
 
-    char ip_buf[16];
-    memset(ip_buf, 0, sizeof(ip_buf));
-    if (esp_ip4addr_ntoa(&data->ip_info.ip, ip_buf, sizeof(ip_buf)) != nullptr) {
-        wifihandler->IP = std::string(ip_buf);
-    } else {
-        wifihandler->IP = "";
+    if (esp_ip4addr_ntoa(&data->ip_info.ip, ip_buf, sizeof(ip_buf)) != nullptr)
+    {
+            new_ip = ip_buf;
+    }
+    else
+    {
+        new_ip = "";
     }
 
-    ESP_LOGI(TAG, "IP: %s", wifihandler->get_ip().c_str());
+    if (xSemaphoreTake(wifihandler->mutex_, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "WIFI MUTEX LOCK FAILURE :(");
+        return;
+    }
 
-    return;
+    wifihandler->IP = new_ip;
+
+    xSemaphoreGive(wifihandler->mutex_);
+
+    ESP_LOGI(TAG, "IP: %s\n", new_ip.c_str());
 }
 
 ////////////
 
 esp_err_t WifiHandler::wifi_init() {
+    if (mutex_ == nullptr)
+    {
+        mutex_ = xSemaphoreCreateMutex(); // Create mutex_
+
+        if (mutex_ == nullptr)
+        {
+            ESP_LOGE(TAG, "WIFI MUTEX FAILURE");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_START, &on_wifi_init_finished, this));
         ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &on_wifi_connected, this));
         ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_assigned_ip, this));
@@ -90,21 +121,42 @@ esp_err_t WifiHandler::wifi_init() {
 }
 
 esp_err_t WifiHandler::wifi_connect() {
-    if (wifi_ready) {
-        esp_err_t result = esp_wifi_connect();
-        ESP_ERROR_CHECK(result);
-        if (result != ESP_OK) {
-            ESP_LOGW(TAG, "WIFI CONNECTION FAILURE");
-            return result;
-        }
-
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "WIFI MUTEX LOCK FAILURE :(");
+        return ESP_ERR_TIMEOUT;
+    }
+    
+    if (!wifi_ready)
+    {
+        xSemaphoreGive(mutex_);
+        return ESP_ERR_WIFI_NOT_STARTED;
+    }
+    
+    esp_err_t result = esp_wifi_connect();
+    
+    xSemaphoreGive(mutex_);
+        
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "WIFI CONNECTION FAILURE");
         return result;
     }
-    return ESP_ERR_WIFI_NOT_STARTED;
+
+    return ESP_OK;
 }
 
 std::string WifiHandler::get_ip() {
-    return this->IP;
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) != pdTRUE)
+    {
+        ESP_LOGE(TAG, "WIFI MUTEX LOCK FAILURE :(");
+        return "";
+    }
+
+    std::string current_ip = IP;
+
+    xSemaphoreGive(mutex_);
+
+    return current_ip;
 }
 
 
