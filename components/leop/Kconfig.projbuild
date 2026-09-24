@@ -1,0 +1,13 @@
+menu "LEOP Server"
+
+    config LEOP_SERVER_URL
+        string "LEOP_SERVER_URL"
+        help
+            URL where leop server API can be reached.
+
+    config LEOP_SERVER_PORT
+        string "LEOP_SERVER_PORT"
+        help
+            Port on URL where leop server API can be reached.
+
+endmenu

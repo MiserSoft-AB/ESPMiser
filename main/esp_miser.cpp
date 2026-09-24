@@ -8,6 +8,7 @@
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
 
+#include <esp_psram.h>
 #include <portmacro.h>
 #include <esp_err.h>
 #include <freertos/projdefs.h>
@@ -18,7 +19,11 @@
 #include <nvs_flash.h>
 #include <esp_event.h>
 
+#include <esp_partition.h>
+
 static const char* TAG = "esp_miser";
+
+static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64; // 64kb of juicy PSRAM
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
@@ -26,6 +31,15 @@ extern "C" void app_main(void)
 {
   esp_err_t res;
   BaseType_t task_result;
+
+  // Initialize PSRAM
+  ESP_ERROR_CHECK(esp_psram_init());
+  if (esp_psram_is_initialized()) 
+  {
+    ESP_LOGI(TAG, "PSRAM found! Size: %u bytes\n", esp_psram_get_size()); // Use psram_get_size() for total
+  } else {
+    ESP_LOGI(TAG, "PSRAM not found.\n");
+  }
 
   // Start watchdog task
   res = MiserSysMon::start();
@@ -66,11 +80,12 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create ui task");
 
   // Start leop fetcher task
+  LeopFetcher Lf(LEOP_RESPONSE_BUF_SIZE);
   task_result = xTaskCreate(
-    LeopFetcher::leop_fetch_task_test,
+    LeopFetcher::leop_fetch_task,
     "leop_fetcher",
     4096,
-    nullptr,
+    &Lf,
     task_priorities::NETWORK,
     nullptr
   );
@@ -80,7 +95,7 @@ extern "C" void app_main(void)
   // Start sensors task
   task_result = xTaskCreate(
     Sensors::sensors_task_test,
-    "leop_fetcher",
+    "sensors_task",
     4096,
     nullptr,
     task_priorities::SENSOR,

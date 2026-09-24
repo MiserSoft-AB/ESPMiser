@@ -6,19 +6,26 @@
 #include <esp_log.h>
 #include <string>
 
-// WARNING: Not thread-safe as-is, need careful handling in tasks
-// TODO: Yeet std:string allocation from task, use static buffer size
+// WARNING: Not thread-safe as-is, need careful handling in tasks (or just use in one task)
+
+/*
+Usage approach:
+Caller constructs class and inits client_init()
+Then provides a callback to request that is to be run when data is recieved
+Either it can read it in chunks and process, or it can read it all into its own buffer
+Do note that the client will be blocked until all is read
+*/
+
+// Callback function: (pointer to user context, pointer to data chunkkk, length of chunk)
+using http_data_callback = void (*)(void* ctx, const char* data, size_t len);
 
 class EspHttpClient 
 {
 public:
   struct Config {
-    // const char* url = ""; // No need to set this, it will be overwritten in get/post
-    // const char* cert_pem; //for https
     int timeout_ms = 5000;
-    int event_handler_mask = HTTP_EVENT_ERROR | HTTP_EVENT_ON_DATA;
-    size_t response_body_max_len = 2048;
-    const char* def_url = "http://httpforever.com";
+    int event_handler_mask = HTTP_EVENT_ERROR | HTTP_EVENT_ON_DATA; // is this used?
+    const char* def_url = "http://httpforever.com"; // only init, is overriden on request
     
     // TODO: (maybe) add flow for async functionality
     // blocking flow right now calling perform() and using event_handler
@@ -30,7 +37,7 @@ public:
   // Only inits class, http_client opened on get()/post() using client_init()
   EspHttpClient(const Config& cfg);
 
-  // Also runs client_clean()
+  // Also runs client_clean() NOTE: AVOID, frees heap for response_body_
   ~EspHttpClient();
 
   // No copy, no move
@@ -39,21 +46,14 @@ public:
   EspHttpClient(EspHttpClient&&) noexcept = delete;
   EspHttpClient& operator=(EspHttpClient&&) noexcept = delete;
 
-  // Perform a GET request. Streams response to event_handler
-  esp_err_t get(const std::string& full_path);
+  /* Pass URL, callback function for reading data, and user context */
+  esp_err_t get(const char* url, http_data_callback on_data_recv, void* ctx);
 
-  // Perform a POST request with JSON or form data.
-  esp_err_t post(const std::string& full_path, const std::string &payload = "");
-
-  // Not sure if we should keep this, if stuff should be done via event_handler only
-  esp_err_t read_body(std::string &out_body);
-  // const std::string get_response_body() const { return response_body_; }
+  // // Perform a POST request with JSON or form data.
+  // esp_err_t post(const std::string& full_path, const std::string &payload = "");
   
   // Inits the esp_http_client with config values
   esp_err_t client_init();
-
-  // Task for running simple fetch
-  static void test_fetch_task (void* parameter);
 
   // Checks HTTP status code
   int check_status_code();
@@ -62,13 +62,11 @@ private:
   Config config_;
   esp_http_client_handle_t client_ = nullptr;
 
-  std::string response_body_;
+  http_data_callback active_callback_ = nullptr;
+  void*              active_context_ = nullptr;
 
   void client_reset();
   void client_clean();
-
-  // Helper to parse response code
-  // void check_response_code();
 
   // Event handler callback 
   static esp_err_t event_handler(esp_http_client_event_t* event);

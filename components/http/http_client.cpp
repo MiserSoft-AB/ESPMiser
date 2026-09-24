@@ -48,41 +48,41 @@ esp_err_t EspHttpClient::client_init()
   return ESP_OK;
 }
 
-void EspHttpClient::test_fetch_task (void* parameter) 
-{
-  // Create client config
-  EspHttpClient::Config Cfg {};
-  Cfg.timeout_ms = 3000;
-  Cfg.response_body_max_len = 4096;
-
-  // Create client
-  EspHttpClient client(Cfg);
-  while (true)
-  {
-    // --- Request 1: GET ---
-    esp_err_t err = client.get("http://httpforever.com");
-    if (err == ESP_OK) 
-    {
-      int status = client.check_status_code();
-      std::string body;
-      client.read_body(body);
-      ESP_LOGI("http_task", "GET Status: %d, Body: %s", status, body.c_str());
-    }
-
-    // --- Request 2: POST (Reusing same client) ---
-    // Note: With the reset_request_state fix, headers from GET won't leak here.
-    // std::string payload = "{\"key\": \"value\"}";
-    // err = client.post("http://api.example.com/update", payload);
-    // if (err == ESP_OK) {
-    //   int status = client.check_status_code();
-    //   ESP_LOGI("TASK", "POST Status: %d", status);
-    // }
-
-    // Destructor runs client_clean() automatically
-    // vTaskDelete(NULL);
-    vTaskDelay(pdMS_TO_TICKS(5000));
-  }
-}
+// void EspHttpClient::test_fetch_task (void* parameter) 
+// {
+//   // Create client config
+//   EspHttpClient::Config Cfg {};
+//   Cfg.timeout_ms = 3000;
+//   Cfg.response_buf_max_len = 4096;
+//
+//   // Create client
+//   EspHttpClient client(Cfg);
+//   while (true)
+//   {
+//     // --- Request 1: GET ---
+//     esp_err_t err = client.get("http://httpforever.com");
+//     if (err == ESP_OK) 
+//     {
+//       int status = client.check_status_code();
+//       std::string body;
+//       client.read_body(body);
+//       ESP_LOGI("http_task", "GET Status: %d, Body: %s", status, body.c_str());
+//     }
+//
+//     // --- Request 2: POST (Reusing same client) ---
+//     // Note: With the reset_request_state fix, headers from GET won't leak here.
+//     // std::string payload = "{\"key\": \"value\"}";
+//     // err = client.post("http://api.example.com/update", payload);
+//     // if (err == ESP_OK) {
+//     //   int status = client.check_status_code();
+//     //   ESP_LOGI("TASK", "POST Status: %d", status);
+//     // }
+//
+//     // Destructor runs client_clean() automatically
+//     // vTaskDelete(NULL);
+//     vTaskDelay(pdMS_TO_TICKS(5000));
+//   }
+// }
 
 
 void EspHttpClient::client_reset()
@@ -91,8 +91,10 @@ void EspHttpClient::client_reset()
   // Clear headers
   esp_http_client_set_header(client_, "Content-Type", nullptr);
   esp_http_client_set_header(client_, "Content-Length", nullptr);
-  // Clear body
-  response_body_.clear();
+
+  // Reset callback state
+  active_callback_ = nullptr;
+  active_context_ = nullptr;
 }
 
 void EspHttpClient::client_clean()
@@ -110,7 +112,7 @@ int EspHttpClient::check_status_code()
   return esp_http_client_get_status_code(client_);
 }
 
-esp_err_t EspHttpClient::get(const std::string& full_path)
+esp_err_t EspHttpClient::get(const char* url, http_data_callback on_data_recv, void* ctx)
 {
   esp_err_t res = ESP_OK;
 
@@ -125,13 +127,17 @@ esp_err_t EspHttpClient::get(const std::string& full_path)
     }
   }
 
+  // Store callback for event handler
+  active_callback_ = on_data_recv;
+  active_context_  = ctx;
+
   // Must reset headers/response_body if previous request's been made
   client_reset();
 
-  ESP_LOGI(TAG, "Setting URL: %s", full_path.c_str());
+  ESP_LOGI(TAG, "Setting URL: %s", url);
 
   // Set the URL
-  res = esp_http_client_set_url(client_, full_path.c_str());
+  res = esp_http_client_set_url(client_, url);
   if (res != ESP_OK)
   {
     ESP_LOGE(TAG, "esp_http_client_set_url failed");
@@ -145,7 +151,8 @@ esp_err_t EspHttpClient::get(const std::string& full_path)
     return res;
   }
 
-  // Perform the request specified by client config
+  // Perform the request according to the event_handler
+  // During this HTTP_EVENT_ON_DATA, active_callback_ is called for each data chunk
   res = esp_http_client_perform(client_);
   if (res != ESP_OK)
   {
@@ -156,92 +163,95 @@ esp_err_t EspHttpClient::get(const std::string& full_path)
   return res;
 }
 
-esp_err_t EspHttpClient::post(const std::string& full_path, const std::string& payload) 
-{
-  esp_err_t res = ESP_OK;
+// esp_err_t EspHttpClient::post(const std::string& full_path, const std::string& payload) 
+// {
+//   esp_err_t res = ESP_OK;
+//
+//   // Try to open connection
+//   if (!client_)
+//   {
+//     res = client_init();
+//     if (res != 0)
+//     {
+//       ESP_LOGE(TAG, "Couldn't init esp_http");
+//       return res;
+//     }
+//   }
+//
+//   // Must reset headers/response_body if previous request's been made
+//   client_reset();
+//
+//   // Set the URL
+//   res = esp_http_client_set_url(client_, full_path.c_str());
+//   if (res != ESP_OK)
+//   {
+//     ESP_LOGE(TAG, "esp_http_client_set_url failed");
+//     return res;
+//   }
+//
+//   // Set method to POST
+//   res = esp_http_client_set_method(client_, HTTP_METHOD_POST);
+//   if (res != ESP_OK) 
+//   {
+//     ESP_LOGE(TAG, "esp_http_client_set_method failed");
+//     return res;
+//   }
+//
+//   // Set content length and body
+//   size_t payload_len = payload.length();
+//   res = esp_http_client_set_header(client_, "Content-Length", 
+//     std::to_string(payload_len).c_str());
+//   if (res != ESP_OK) 
+//   {
+//     ESP_LOGE(TAG, "esp_http_client_set_header Content-Length failed");
+//     return res;
+//   }
+//
+//   // Default to application/json
+//   // TODO: Make this configurable
+//   res = esp_http_client_set_header(client_, "Content-Type", "application/json");
+//   if (res != ESP_OK) 
+//   {
+//     ESP_LOGE(TAG, "esp_http_client_set_header Content-Type failed");
+//     return res;
+//   }
+//
+//   // Write payload
+//   if (payload_len > 0) 
+//   {
+//     int written = esp_http_client_write(client_, payload.c_str(), payload_len);
+//     if (written < 0 || ((size_t)written != payload_len)) {
+//       ESP_LOGE(TAG, "esp_http_client_write failed: wrote %d of %zu", written, payload_len);
+//       return ESP_FAIL;
+//     }
+//   }
+//
+//   // Perform the request
+//   res = esp_http_client_perform(client_);
+//   if (res != ESP_OK) 
+//   {
+//     ESP_LOGE(TAG, "esp_http_client_perform failed");
+//     return res;
+//   }
+//
+//   return res;
+// }
 
-  // Try to open connection
-  if (!client_)
-  {
-    res = client_init();
-    if (res != 0)
-    {
-      ESP_LOGE(TAG, "Couldn't init esp_http");
-      return res;
-    }
-  }
-
-  // Must reset headers/response_body if previous request's been made
-  client_reset();
-
-  // Set the URL
-  res = esp_http_client_set_url(client_, full_path.c_str());
-  if (res != ESP_OK)
-  {
-    ESP_LOGE(TAG, "esp_http_client_set_url failed");
-    return res;
-  }
-
-  // Set method to POST
-  res = esp_http_client_set_method(client_, HTTP_METHOD_POST);
-  if (res != ESP_OK) 
-  {
-    ESP_LOGE(TAG, "esp_http_client_set_method failed");
-    return res;
-  }
-
-  // Set content length and body
-  size_t payload_len = payload.length();
-  res = esp_http_client_set_header(client_, "Content-Length", 
-    std::to_string(payload_len).c_str());
-  if (res != ESP_OK) 
-  {
-    ESP_LOGE(TAG, "esp_http_client_set_header Content-Length failed");
-    return res;
-  }
-
-  // Default to application/json
-  // TODO: Make this configurable
-  res = esp_http_client_set_header(client_, "Content-Type", "application/json");
-  if (res != ESP_OK) 
-  {
-    ESP_LOGE(TAG, "esp_http_client_set_header Content-Type failed");
-    return res;
-  }
-
-  // Write payload
-  if (payload_len > 0) 
-  {
-    int written = esp_http_client_write(client_, payload.c_str(), payload_len);
-    if (written < 0 || ((size_t)written != payload_len)) {
-      ESP_LOGE(TAG, "esp_http_client_write failed: wrote %d of %zu", written, payload_len);
-      return ESP_FAIL;
-    }
-  }
-
-  // Perform the request
-  res = esp_http_client_perform(client_);
-  if (res != ESP_OK) 
-  {
-    ESP_LOGE(TAG, "esp_http_client_perform failed");
-    return res;
-  }
-
-  return res;
-}
-
-esp_err_t EspHttpClient::read_body(std::string &out_body)
-{
-  if (!client_) 
-  {
-    ESP_LOGE(TAG, "Client not open");
-    return ESP_ERR_NOT_ALLOWED;
-  }
-
-  // In blocking mode with event handler capturing data, the body is already in response_body_
-  out_body = response_body_;
-  return ESP_OK;
-}
+// esp_err_t EspHttpClient::read_body(char* _out_buf, size_t _out_buf_len)
+// {
+//   if (!client_) 
+//   {
+//     ESP_LOGE(TAG, "Client not open");
+//     return ESP_ERR_NOT_ALLOWED;
+//   }
+//   if (!_out_buf)
+//   {
+//     ESP_LOGE(TAG, "Invalid arguments");
+//     return ESP_ERR_NOT_ALLOWED;
+//   }
+//
+//   return ESP_OK;
+// }
 
 esp_err_t EspHttpClient::event_handler(esp_http_client_event_t* event)
 {
@@ -250,61 +260,53 @@ esp_err_t EspHttpClient::event_handler(esp_http_client_event_t* event)
   
   if (!Client) 
   {
-    ESP_LOGE("http_client", "event_handler: user_data is null!");
+    ESP_LOGE(TAG, "event_handler: user_data is null!");
     return ESP_ERR_INVALID_ARG;
   }
 
   switch (event->event_id) 
   {
     case HTTP_EVENT_ERROR:
-      ESP_LOGE("http_client", "HTTP_EVENT_ERROR");
+      ESP_LOGE(TAG, "HTTP_EVENT_ERROR");
       break;
       
     case HTTP_EVENT_ON_CONNECTED:
-      ESP_LOGI("http_client", "HTTP_EVENT_ON_CONNECTED");
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_CONNECTED");
       break;
       
     case HTTP_EVENT_HEADERS_SENT:
-      ESP_LOGI("http_client", "HTTP_EVENT_HEADERS_SENT");
+      ESP_LOGI(TAG, "HTTP_EVENT_HEADERS_SENT");
       break;
       
     case HTTP_EVENT_ON_HEADER:
-      ESP_LOGI("http_client", "HTTP_EVENT_ON_HEADER, key=%s, value=%s", 
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", 
         event->header_key, event->header_value);
       break;
       
     case HTTP_EVENT_ON_DATA:
-      ESP_LOGI("http_client", "HTTP_EVENT_ON_DATA, len=%d", event->data_len);
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", event->data_len);
 
-      // Append data chunk to response body
-      if (event->data_len > 0 && event->data != nullptr) 
+      // Call callback if one is set and data exists
+      if (Client->active_callback_ && event->data_len > 0 && event->data != nullptr) 
       {
-        // Avoid writing more data than we allow
-        if (event->data_len < Client->config_.response_body_max_len)
-        {
-          Client->response_body_.append(
-            static_cast<const char*>(event->data), 
-            event->data_len
-          );
-        } else {
-          Client->response_body_.append(
-            static_cast<const char*>(event->data), 
-            Client->config_.response_body_max_len
-          );
-        }
+        Client->active_callback_(
+          Client->active_context_, 
+          static_cast<const char*>(event->data),
+          event->data_len
+        );
       }
       break;
       
     case HTTP_EVENT_ON_FINISH:
-      ESP_LOGI("http_client", "HTTP_EVENT_ON_FINISH");
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
       break;
       
     case HTTP_EVENT_DISCONNECTED:
-      ESP_LOGI("http_client", "HTTP_EVENT_DISCONNECTED");
+      ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
       break;
       
     case HTTP_EVENT_REDIRECT:
-      ESP_LOGI("http_client", "HTTP_EVENT_REDIRECT");
+      ESP_LOGI(TAG, "HTTP_EVENT_REDIRECT");
       break;
   }
 
