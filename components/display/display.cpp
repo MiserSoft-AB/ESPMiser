@@ -1,6 +1,7 @@
 #include "display.hpp"
 
 #include <cstdint> //I don't remember if we should avoid using 'std's
+                   // Nah dude, yolo
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"

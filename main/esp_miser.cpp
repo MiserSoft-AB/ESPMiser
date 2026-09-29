@@ -1,13 +1,16 @@
-#include "esp_err.h"
-#include "esp_wifi_default.h"
-#include "freertos/projdefs.h"
 #include "http_client.hpp"
-#include "nvs.h"
-#include "portmacro.h"
 #include "wifi.hpp"
+#include "task_priorities.hpp"
 #include "sysmon_task.hpp"
 #include "display.hpp"
+#include "ui_queue.hpp"
+#include "ui_task.hpp"
+#include "leop_fetcher.hpp"
+#include "sensors_task.hpp"
 
+#include <portmacro.h>
+#include <esp_err.h>
+#include <freertos/projdefs.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -15,20 +18,19 @@
 #include <nvs_flash.h>
 #include <esp_event.h>
 
-
 static const char* TAG = "esp_miser";
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 
-
 extern "C" void app_main(void)
 {
   esp_err_t res;
+  BaseType_t task_result;
 
   // Start watchdog task
   res = MiserSysMon::start();
   if (res != ESP_OK)
-    ESP_LOGE(TAG, "Failed to create system watchdof task: %s", esp_err_to_name(res));
+    ESP_LOGE(TAG, "Failed to create system watchdog task: %s", esp_err_to_name(res));
 
   esp_err_t flash_res = nvs_flash_init();
   ESP_ERROR_CHECK(flash_res);
@@ -44,34 +46,53 @@ extern "C" void app_main(void)
 
   ESP_ERROR_CHECK(g_wifihandler.wifi_init());
 
-  BaseType_t task_result = xTaskCreate(
-    EspHttpClient::test_fetch_task,   //the function freertos should execute as a task
-    "network_task", // name for debugging
-    8192,           // stack size for the task in ESP-IDF
-    nullptr,        // parameter to pass to the task, for example could be &config
-    5,              // task priority
-    nullptr         // optional task handle
+  // Start display (maybe make part of ui init or keep separate?)
+  task_result = xTaskCreate( 
+    display_task,
+    "display_task",
+    4096,
+    nullptr,
+    task_priorities::DISPLAY,
+    nullptr
   );
-
   if (task_result != pdPASS)
-  {
-    ESP_LOGE(TAG, "Failed to create network task");
-  }
-
-  BaseType_t display_task_result = xTaskCreate( 
-    display_task,               
-    "display_task",             
-    4096,                       
-    nullptr,                    
-    3,                         
-    nullptr                  
-  );
-
-  if (display_task_result != pdPASS) //pdPASS = task created successfully
-  {
     ESP_LOGE(TAG, "Failed to create display task");
-  }
 
-  ESP_LOGI(TAG, "hello");
+  // Start UI
+  UiQueue::init(); // Create queue
+  task_result = xTaskCreate(
+    Ui::ui_task,
+    "ui_task",
+    4096,
+    nullptr,
+    task_priorities::DISPLAY, //UI prio?
+    nullptr
+  );
+  if (task_result != pdPASS)
+    ESP_LOGE(TAG, "Failed to create ui task");
+
+  // Start leop fetcher task
+  task_result = xTaskCreate(
+    LeopFetcher::leop_fetch_task_test,
+    "leop_fetcher",
+    4096,
+    nullptr,
+    task_priorities::NETWORK,
+    nullptr
+  );
+  if (task_result != pdPASS) //pdPASS = task created successfully
+    ESP_LOGE(TAG, "Failed to create leoppp task");
+
+  // Start sensors task
+  task_result = xTaskCreate(
+    Sensors::sensors_task_test,
+    "leop_fetcher",
+    4096,
+    nullptr,
+    task_priorities::SENSOR,
+    nullptr
+  );
+  if (task_result != pdPASS) //pdPASS = task created successfully
+    ESP_LOGE(TAG, "Failed to create sensors task");
 
 }
