@@ -26,6 +26,7 @@ static const char* TAG = "esp_miser";
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64; // 64kb of juicy PSRAM
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
+static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
 
 extern "C" void app_main(void)
 {
@@ -34,12 +35,8 @@ extern "C" void app_main(void)
 
   // Initialize PSRAM
   ESP_ERROR_CHECK(esp_psram_init());
-  if (esp_psram_is_initialized()) 
-  {
-    ESP_LOGI(TAG, "PSRAM found! Size: %u bytes\n", esp_psram_get_size()); // Use psram_get_size() for total
-  } else {
-    ESP_LOGI(TAG, "PSRAM not found.\n");
-  }
+  if (!esp_psram_is_initialized()) 
+    ESP_LOGW(TAG, "PSRAM not found.\n");
 
   // Start watchdog task
   res = MiserSysMon::start();
@@ -80,12 +77,11 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create ui task");
 
   // Start leop fetcher task
-  LeopFetcher Lf(LEOP_RESPONSE_BUF_SIZE);
   task_result = xTaskCreate(
     LeopFetcher::leop_fetch_task,
     "leop_fetcher",
     4096,
-    &Lf,
+    &g_Lf,
     task_priorities::NETWORK,
     nullptr
   );

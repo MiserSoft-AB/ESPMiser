@@ -28,7 +28,10 @@ public:
   // Since callback  of class we need a way for it to see buffer size
   size_t get_res_buf_size() { return res_size_; }
   size_t get_res_buf_len() { return res_len_; }
-  char* get_res_buf() { return res_buf_; }
+  char*  get_res_buf() { return res_buf_; }
+
+  // Reset buffer for new read
+  void reset_buffer(void) { if (res_buf_) { res_buf_[0] = '\0'; res_len_ = 0; } }
 
 private:
   char*  res_buf_ = nullptr; // Response buffer
@@ -36,7 +39,6 @@ private:
   const size_t res_size_;    // How much fits in buffer (allocates to PSRAM || heap)
 
   // Callback function (must be static to match C style function pointer)
-  // Pass 
   static void on_data_recieve(void* ctx, const char* data, size_t len);
 
 };

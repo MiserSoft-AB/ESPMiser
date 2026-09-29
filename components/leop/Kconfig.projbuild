@@ -10,4 +10,10 @@ menu "LEOP Server"
         help
             Port on URL where leop server API can be reached.
 
+    config LEOP_SERVER_FACILITY_NAME
+        string "LEOP_SERVER_FACILITY_NAME"
+        help
+            Name of facility on the LEOP server where data should be fetched from.
+
+
 endmenu

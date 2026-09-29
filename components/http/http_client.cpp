@@ -127,12 +127,12 @@ esp_err_t EspHttpClient::get(const char* url, http_data_callback on_data_recv, v
     }
   }
 
+  // Must reset headers/response_body if previous request's been made
+  client_reset();
+
   // Store callback for event handler
   active_callback_ = on_data_recv;
   active_context_  = ctx;
-
-  // Must reset headers/response_body if previous request's been made
-  client_reset();
 
   ESP_LOGI(TAG, "Setting URL: %s", url);
 
@@ -284,7 +284,7 @@ esp_err_t EspHttpClient::event_handler(esp_http_client_event_t* event)
       break;
       
     case HTTP_EVENT_ON_DATA:
-      ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", event->data_len);
+      ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, event->data: %p, len=%d Client->callback: %p", event->data, event->data_len, Client->active_callback_);
 
       // Call callback if one is set and data exists
       if (Client->active_callback_ && event->data_len > 0 && event->data != nullptr) 
