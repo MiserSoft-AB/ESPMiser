@@ -32,8 +32,14 @@ extern "C" void app_main(void)
   if (res != ESP_OK)
     ESP_LOGE(TAG, "Failed to create system watchdog task: %s", esp_err_to_name(res));
 
-  // Start nvs and wifi
-  ESP_ERROR_CHECK(nvs_flash_init());
+  esp_err_t flash_res = nvs_flash_init();
+  ESP_ERROR_CHECK(flash_res);
+  if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    nvs_flash_erase();
+    nvs_flash_init();
+  }
+
+
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   esp_netif_create_default_wifi_sta();
