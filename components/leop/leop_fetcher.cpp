@@ -1,5 +1,6 @@
 #include "leop_fetcher.hpp"
 #include "data.h"
+#include "esp_err.h"
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
 #include "ui_queue.hpp"
@@ -8,11 +9,50 @@
 
 #include <time.h> // for rand might remove
 
+// --------------------- Privates -------------------------
+//
 static const char*  TAG = "leop_fetcher";
 static const char*  LEOP_ENDPOINT_DAILY_AVG = "api/v1/average-daily?name=";
 
-// C-style callback function for retrieving data from http_client
-// Can/should this be part of the LeopServer class?
+#define DAILY_INTERVAL_US    (24 * 60 * 60 * 1000 * 1000)
+#define FREQUENT_INTERVAL_US (5 * 60 * 1000 * 1000)       // 300,000 us (5 mins)
+
+void LeopFetcher::on_data_recieve(void* ctx, const char* data, size_t len) 
+{
+  LeopFetcher* This = static_cast<LeopFetcher*>(ctx);
+
+  if (!This || !This->res_buf_ || len <= 0 || !data) 
+    return;
+
+  // ESP_LOGI(TAG, "on_recieive: Writing %zu bytes to buffer", len);
+
+  // Make sure we have enough space left in buffer (+1 for nullterm)
+  if (This->res_len_ + len + 1 > This->res_size_) 
+  {
+    ESP_LOGW(TAG, "Response too large, truncating");
+    len = This->res_size_ - This->res_len_ - 1;
+  }
+  
+  // Write data to response buffer from last index
+  memcpy(&This->res_buf_[This->res_len_], data, len);  
+  This->res_len_ += len;
+  This->res_buf_[This->res_len_] = '\0'; // nullterm last byte
+}
+
+bool IRAM_ATTR LeopFetcher::on_timer_alarm(
+  gptimer_handle_t timer,
+  const gptimer_alarm_event_data_t* edata, 
+  void* user_ctx) 
+{
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  if (user_ctx) // Task to notify 
+  {
+    vTaskNotifyGiveFromISR((TaskHandle_t)user_ctx, &xHigherPriorityTaskWoken);
+  }
+  return xHigherPriorityTaskWoken == pdTRUE; // Yield
+}
+
+// --------------------- Interface -------------------------
 
 LeopFetcher::LeopFetcher(size_t res_buf_size) 
   : res_size_(res_buf_size) 
@@ -36,6 +76,89 @@ LeopFetcher::~LeopFetcher()
 {
   if (res_buf_)
     free(res_buf_);
+}
+
+esp_err_t LeopFetcher::setup_gptimer(uint32_t interval_ms)
+{
+  esp_err_t err;
+  timer_interval_ms_ = interval_ms;
+
+  // Guards
+  if (timer_handle_)
+  {
+    ESP_LOGE(TAG, "timer_handle_ already initialized");
+    return ESP_ERR_INVALID_STATE;
+  }
+  if (!task_handle_)
+  {
+    ESP_LOGE(TAG, "task_handle_ not initialized");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  // Create GPTIMER
+  gptimer_config_t timer_config = {
+    .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+    .direction = GPTIMER_COUNT_UP,
+    .resolution_hz = 1000000, // 1 MHz = 1 us resolution
+  };
+  err = gptimer_new_timer(&timer_config, &timer_handle_);
+  if (err != ESP_OK) 
+  {
+    ESP_LOGE(TAG, "gptimer_new_timer");
+    return err;
+  }
+
+  // Register Callback
+  // Passing the task handle as user_ctx so the ISR knows which task to notify
+  // and our ISR callback to notify it
+  gptimer_event_callbacks_t cbs = { 
+    .on_alarm = on_timer_alarm
+  };
+  err = gptimer_register_event_callbacks(timer_handle_, &cbs, task_handle_);
+  if (err != ESP_OK) 
+  {
+    ESP_LOGE(TAG, "gptimer_register_event_callbacks");
+    gptimer_del_timer(timer_handle_);
+    return err;
+  }
+
+  // Configure Alarm
+  // Convert ms to us
+  uint64_t interval_us = (uint64_t)interval_ms * 1000ULL;
+
+  gptimer_alarm_config_t alarm_config = {
+    .alarm_count = interval_us,
+    .reload_count = 0,
+    .flags = { .auto_reload_on_alarm = true }, // Periodic
+  };
+  err = gptimer_set_alarm_action(timer_handle_, &alarm_config);
+  if (err != ESP_OK) 
+  {
+    ESP_LOGE(TAG, "gptimer_set_alarm_action");
+    gptimer_del_timer(timer_handle_);
+    return err;
+  }
+
+  // Enable and start timer
+  err = gptimer_enable(timer_handle_);
+  if (err != ESP_OK) 
+  {
+    ESP_LOGE(TAG, "gptimer_enable");
+    gptimer_del_timer(timer_handle_);
+    return err;
+  }
+  err = gptimer_start(timer_handle_);
+  if (err != ESP_OK) 
+  {
+    ESP_LOGE(TAG, "gptimer_start");
+    gptimer_disable(timer_handle_);
+    gptimer_del_timer(timer_handle_);
+    return err;
+  }
+  
+  // Switch bool to signal that this instance is running timer
+  gptimer_enabled_ = true;
+  return ESP_OK;
 }
 
 void LeopFetcher::leop_fetch_task(void* param) 
@@ -85,6 +208,8 @@ void LeopFetcher::leop_fetch_task(void* param)
 
   while (1) 
   {
+    ESP_LOGI(TAG, "Fetching LEOP data...");
+
     // Clean response buffer
     This->reset_buffer();
 
@@ -107,28 +232,10 @@ void LeopFetcher::leop_fetch_task(void* param)
 
     UiQueue::send(UiD);
 
-    vTaskDelay(pdMS_TO_TICKS(5000)); // TODO: Implement ISR and GPTIMER instead
+    if (This->gptimer_enabled_) // Wait for GPTIMER signal
+      ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+    else // Fallback to regular delay if timer failed to start is is still starting up
+      vTaskDelay(pdMS_TO_TICKS(This->timer_interval_ms_)); 
   }
 }
 
-void LeopFetcher::on_data_recieve(void* ctx, const char* data, size_t len) 
-{
-  LeopFetcher* This = static_cast<LeopFetcher*>(ctx);
-
-  if (!This || !This->res_buf_ || len <= 0 || !data) 
-    return;
-
-  ESP_LOGI(TAG, "on_recieive: Writing %zu bytes to buffer", len);
-
-  // Make sure we have enough space left in buffer (+1 for nullterm)
-  if (This->res_len_ + len + 1 > This->res_size_) 
-  {
-    ESP_LOGW(TAG, "Response too large, truncating");
-    len = This->res_size_ - This->res_len_ - 1;
-  }
-  
-  // Write data to response buffer from last index
-  memcpy(&This->res_buf_[This->res_len_], data, len);  
-  This->res_len_ += len;
-  This->res_buf_[This->res_len_] = '\0'; // nullterm last byte
-}

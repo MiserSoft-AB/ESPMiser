@@ -15,7 +15,6 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <string>
 #include <nvs_flash.h>
 #include <esp_event.h>
 
@@ -23,7 +22,8 @@
 
 static const char* TAG = "esp_miser";
 
-static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64; // 64kb of juicy PSRAM
+static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
+static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
@@ -82,17 +82,20 @@ extern "C" void app_main(void)
   if (task_result != pdPASS)
     ESP_LOGE(TAG, "Failed to create ui task");
 
-  // Start leop fetcher task
+  // Start leop fetcher task for spots/calcs
   task_result = xTaskCreate(
     LeopFetcher::leop_fetch_task,
     "leop_fetcher",
     4096,
     &g_Lf,
     task_priorities::NETWORK,
-    nullptr
+    g_Lf.get_task_handle()
   );
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
+  // Register gptimer
+  if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // each 15 mins now
+    ESP_LOGE(TAG, "Failed to setup leop task gptimer");
 
   // Start sensors task
   task_result = xTaskCreate(
