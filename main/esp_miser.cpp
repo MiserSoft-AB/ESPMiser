@@ -27,6 +27,7 @@ static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64; // 64kb of juicy PSR
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
+static Sensors     g_S;
 
 extern "C" void app_main(void)
 {
@@ -94,16 +95,23 @@ extern "C" void app_main(void)
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
 
-  // Start sensors task
-  task_result = xTaskCreate(
-    Sensors::sensors_task_test,
-    "sensors_task",
-    4096,
-    nullptr,
-    task_priorities::SENSOR,
-    nullptr
-  );
-  if (task_result != pdPASS) //pdPASS = task created successfully
-    ESP_LOGE(TAG, "Failed to create sensors task");
+  // Setup Sensors timer
+  if (g_S.timer_setup(500) == ESP_OK) 
+  {
+    // Start sensors task
+    task_result = xTaskCreate(
+      Sensors::sensors_task,
+      "sensors_task",
+      4096,
+      &g_S,
+      task_priorities::SENSOR,
+      nullptr
+    );
+    if (task_result != pdPASS) //pdPASS = task created successfully
+      ESP_LOGE(TAG, "Failed to create sensors task");
+  }
+  else
+    ESP_LOGE(TAG, "Failed to setup sensors timer");
+
 
 }
