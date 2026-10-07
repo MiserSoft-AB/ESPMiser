@@ -7,6 +7,7 @@
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
+#include "uart_interface.hpp"
 
 #include <esp_psram.h>
 #include <portmacro.h>
@@ -27,6 +28,7 @@ static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64; // 64kb of juicy PSR
 
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
+static UartInterface g_UaIn(nullptr);
 
 extern "C" void app_main(void)
 {
@@ -106,4 +108,8 @@ extern "C" void app_main(void)
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create sensors task");
 
+  // Init UART diagnostics interface
+  if (g_UaIn.uart_init() != ESP_OK)
+    ESP_LOGE(TAG, "Failed to init UART Interface");
+  
 }
