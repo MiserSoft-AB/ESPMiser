@@ -18,7 +18,7 @@ class UartInterface
 public:
 
   // Pass nullptr to use default config
-  UartInterface(uart_config_t* uart_cfg);   
+  UartInterface(uart_config_t* uart_cfg);
   ~UartInterface();
 
   // No copy, no move
@@ -29,10 +29,15 @@ public:
 
   esp_err_t uart_init(void);
 
+  // Task function (needs class instance passed as param)
+  static void uart_interface_task(void* param);
+
 private:
   const uart_config_t* uart_cfg_;
-  const uint16_t       buf_size_ = 1024;
 
+  // Buffer members
+  uint8_t*       read_buf_ = nullptr;
+  const uint16_t buf_size_ = 1024;
 };
 
 #endif // __UART_INTERFACE_HPP__

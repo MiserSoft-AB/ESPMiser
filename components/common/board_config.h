@@ -11,8 +11,8 @@ extern "C" {
 
 /*------------------- UART Config -------------------*/
 #define UART_PORT UART_NUM_1
-#define UART_TX_PIN 17
-#define UART_RX_PIN 16
+#define UART_TX_PIN 43
+#define UART_RX_PIN 44
 
 
 #ifdef __cplusplus
