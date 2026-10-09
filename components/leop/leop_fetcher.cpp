@@ -62,7 +62,7 @@ LeopFetcher::LeopFetcher(size_t res_buf_size)
   {
     ESP_LOGW(TAG, "Failed to allocate buffer to PSRAM, falling back to internal heap...");
 
-    res_buf_ = (char*)malloc(res_size_); // Fallback to internal heap
+    res_buf_ = (char*)malloc(res_buf_size); // Fallback to internal heap
     if (!res_buf_) 
     {
       ESP_LOGE(TAG, "Out of memory entirely...");

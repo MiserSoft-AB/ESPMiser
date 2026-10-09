@@ -7,6 +7,7 @@
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
+#include "uart_interface.hpp"
 
 #include <esp_psram.h>
 #include <portmacro.h>
@@ -28,6 +29,7 @@ static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gp
 static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
 static Sensors     g_S;
+static UartInterface g_UaIf(nullptr);
 
 extern "C" void app_main(void)
 {
@@ -86,7 +88,7 @@ extern "C" void app_main(void)
   // Start leop fetcher task for spots/calcs
   task_result = xTaskCreate(
     LeopFetcher::leop_fetch_task,
-    "leop_fetcher",
+    "leop_fetcher_task",
     4096,
     &g_Lf,
     task_priorities::NETWORK,
@@ -94,6 +96,7 @@ extern "C" void app_main(void)
   );
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
+
   // Register gptimer
   if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // each 15 mins now
     ESP_LOGE(TAG, "Failed to setup leop task gptimer");
@@ -116,5 +119,20 @@ extern "C" void app_main(void)
   else
     ESP_LOGE(TAG, "Failed to setup sensors timer");
 
+  // Init UART diagnostics interface
+  if (g_UaIf.uart_init() != ESP_OK)
+    ESP_LOGE(TAG, "Failed to init UART Interface");
 
+  // Start UART interface task
+  task_result = xTaskCreate(
+    UartInterface::uart_interface_task,
+    "uart_interface_task",
+    4096,
+    &g_UaIf,
+    10,
+    nullptr
+  );
+  if (task_result != pdPASS) //pdPASS = task created successfully
+    ESP_LOGE(TAG, "Failed to create UART Interface task");
+  
 }
