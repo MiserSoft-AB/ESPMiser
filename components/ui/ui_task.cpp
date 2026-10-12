@@ -7,9 +7,10 @@ static const char* TAG = "ui_task";
 
 void Ui::ui_task(void* param) {
   // Local copy of ui data
-  Ui_Data UiD;
-  ui_data_init(&UiD);
-  
+  UiQueue::Data UiD;
+  data_leop_init(&UiD.leop);
+  data_sensor_init(&UiD.sensor);
+  data_wifi_init(&UiD.wifi);
 
   while (true) {
     // Block until data arrives, timeout after 100ms
@@ -17,26 +18,29 @@ void Ui::ui_task(void* param) {
     {
       switch (UiD.type) 
       {
-        case UI_NO_DATA:
-          ESP_LOGI(TAG, "Data recieved but no type specified");
+        case DATA_NONE:
+          ESP_LOGI(TAG, "Data recieved with type none...");
           break;
-        case UI_LEOP_DATA:
-          ESP_LOGI(TAG, "Leop Data recieved: %f", UiD.leop_data.price);
+        case DATA_LEOP:
+          ESP_LOGI(TAG, "Leop Data recieved: %f", UiD.leop.price);
           break;
-        case UI_SENSOR_DATA:
+        case DATA_SENSOR:
           ESP_LOGI(TAG, "Sensors Data recieved: temp: %f, humidity: %f, press: %f.", 
-            UiD.sensor_data.temperature,
-            UiD.sensor_data.pressure,
-            UiD.sensor_data.humidity
+            UiD.sensor.temperature,
+            UiD.sensor.pressure,
+            UiD.sensor.humidity
           );
           break;
-        case UI_ALL_DATA:
+        case DATA_ALL:
           ESP_LOGI(TAG, "All data recieved! price: %ftemp: %f, humidity: %f, press: %f.", 
-            UiD.leop_data.price,
-            UiD.sensor_data.temperature,
-            UiD.sensor_data.pressure,
-            UiD.sensor_data.humidity
+            UiD.leop.price,
+            UiD.sensor.temperature,
+            UiD.sensor.pressure,
+            UiD.sensor.humidity
           );
+        default:
+          ESP_LOGW(TAG, "Unknown data recieved");
+          break;
       }
     }
     

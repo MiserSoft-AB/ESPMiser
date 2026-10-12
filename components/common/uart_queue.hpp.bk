@@ -1,0 +1,40 @@
+#ifndef __UART_UPDATER_HPP__
+#define __UART_UPDATER_HPP__
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+
+#include "data.h"
+
+class UartQueue 
+{
+public:
+  static const int QUEUE_LENGTH = 16; // TODO: optimize perfect size
+  static const size_t ITEM_SIZE = sizeof(Uart_Data);
+
+  // Static queue handle and buffer
+  static QueueHandle_t queue;
+  static Uart_Data q_buf[QUEUE_LENGTH];
+
+  static void init();
+
+  // Called by Sensor/Network tasks
+  static int send(Uart_Data const& data);
+
+  // Called by UART task
+  static int receive(Uart_Data& out_data, TickType_t timeout_ticks);
+
+
+  // Optional: Check if data is available without blocking
+  // static bool hasData() {
+  //     if (queue == nullptr) return false;
+  //     return uxQueueMessagesWaiting(queue) > 0;
+  // }
+
+private:
+    UartQueue() {} // Prevent instantiation
+};
+
+#endif // __UART_UPDATER_HPP__

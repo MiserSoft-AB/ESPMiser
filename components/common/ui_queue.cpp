@@ -11,7 +11,7 @@ void UiQueue::init()
   }
 }
 
-int UiQueue::send(Ui_Data const& data) 
+int UiQueue::send(Data const& data) 
 {
   if (queue == nullptr) 
     return 1;
@@ -22,7 +22,7 @@ int UiQueue::send(Ui_Data const& data)
   return 0;
 }
 
-int UiQueue::receive(Ui_Data& out_data, TickType_t timeout_ticks) 
+int UiQueue::receive(Data& out_data, TickType_t timeout_ticks) 
 {
   if (queue == nullptr) 
     return 1;

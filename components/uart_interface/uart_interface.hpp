@@ -17,6 +17,27 @@ class UartInterface
 {
 public:
 
+  enum Command
+  {
+    CMD_HELP, CMD_STATUS, CMD_LEOP, CMD_SENSOR, CMD_CONFIG, CMD_WIFI, CMD_DIAG, 
+  };
+
+  // Returns string equivalent of Command enum choice
+  // Not sure why I made this, it looks neat I guess
+  static const char* cmd_enum_to_string(Command cmd)
+  {
+    switch (cmd)
+    {
+      case CMD_HELP:   return "HELP";
+      case CMD_STATUS: return "STATUS";
+      case CMD_LEOP:   return "LEOP";
+      case CMD_SENSOR: return "SENSOR";
+      case CMD_CONFIG: return "CONFIG";
+      case CMD_WIFI:   return "WIFI";
+      default:         return NULL;
+    }
+  };
+
   // Pass nullptr to use default config
   UartInterface(uart_config_t* uart_cfg);
   ~UartInterface();

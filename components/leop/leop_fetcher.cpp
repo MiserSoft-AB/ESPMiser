@@ -4,6 +4,7 @@
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
 #include "ui_queue.hpp"
+// #include "uart_queue.hpp"
 
 #include "http_client.hpp"
 
@@ -203,8 +204,8 @@ void LeopFetcher::leop_fetch_task(void* param)
   }
 
   // Local copy of ui data
-  Ui_Data UiD;
-  ui_data_init(&UiD);
+  UiQueue::Data UiD;
+  data_leop_init(&UiD.leop);
 
   while (1) 
   {
@@ -226,11 +227,13 @@ void LeopFetcher::leop_fetch_task(void* param)
     // --- Send new parsed data to UI Queue
     // Mock sending data over queue to ui
     srand(time(NULL));
-    UiD.type = UI_LEOP_DATA;
-    UiD.leop_data.price = (float)rand() / RAND_MAX;
-    ESP_LOGI(TAG, "Sending %f to queue.", UiD.leop_data.price);
+    UiD.type = DATA_LEOP;
+    UiD.leop.price = (float)rand() / RAND_MAX;
+    ESP_LOGI(TAG, "Sending %f to queue.", UiD.leop.price);
 
+    // Send to consumer queues
     UiQueue::send(UiD);
+    // UartQueue::send(UiD);
 
     if (This->gptimer_enabled_) // Wait for GPTIMER signal
       ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
