@@ -21,6 +21,9 @@
 
 #include <esp_partition.h>
 
+#include "board_config.h"
+#include <driver/i2c.h>
+
 static const char* TAG = "esp_miser";
 
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
@@ -41,6 +44,23 @@ extern "C" void app_main(void)
   if (!esp_psram_is_initialized()) 
     ESP_LOGW(TAG, "PSRAM not found.\n");
 
+  // Initialize I2C Master
+  i2c_config_t i2c_master_conf = 
+  {
+    .mode           = I2C_MODE_MASTER,
+    .sda_io_num     = I2C_MASTER_SDA_PIN,
+    .scl_io_num     = I2C_MASTER_SCL_PIN,
+    .sda_pullup_en  = GPIO_PULLUP_ENABLE,
+    .scl_pullup_en  = GPIO_PULLUP_ENABLE,
+    .master         = 
+    { 
+      .clk_speed    = I2C_MASTER_FREQ_HZ, 
+    },
+  };
+
+  ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &i2c_master_conf));
+  ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0, 0, 0));
+
   // Start watchdog task
   res = MiserSysMon::start();
   if (res != ESP_OK)
@@ -52,7 +72,6 @@ extern "C" void app_main(void)
     nvs_flash_erase();
     nvs_flash_init();
   }
-
 
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
