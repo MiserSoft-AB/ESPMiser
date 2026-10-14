@@ -14,6 +14,12 @@ extern "C" {
 #define UART_TX_PIN 43
 #define UART_RX_PIN 44
 
+/*------------------- I2C Config --------------------*/
+#define I2C_MASTER_NUM I2C_NUM_0
+#define I2C_MASTER_SDA_PIN 8
+#define I2C_MASTER_SCL_PIN 9
+#define I2C_MASTER_FREQ_HZ 400000 // increase?
+#define I2C_ADDR_BME280    0x77
 
 #ifdef __cplusplus
 } // extern "C"

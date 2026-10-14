@@ -1,6 +1,6 @@
 idf_component_register(SRCS "esp_miser.cpp"
   INCLUDE_DIRS "."
-  REQUIRES  esp_psram nvs_flash driver
+  REQUIRES  esp_psram nvs_flash
   PRIV_REQUIRES http wifi sysmon ui display leop common sensors uart_interface
 )
 

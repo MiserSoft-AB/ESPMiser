@@ -1,4 +1,3 @@
-#include "http_client.hpp"
 #include "wifi.hpp"
 #include "task_priorities.hpp"
 #include "sysmon_task.hpp"
@@ -21,8 +20,8 @@
 
 #include <esp_partition.h>
 
-#include "board_config.h"
-#include <driver/i2c.h>
+// #include "board_config.h"
+// #include <driver/i2c.h>
 
 static const char* TAG = "esp_miser";
 
@@ -44,39 +43,41 @@ extern "C" void app_main(void)
   if (!esp_psram_is_initialized()) 
     ESP_LOGW(TAG, "PSRAM not found.\n");
 
-  // Initialize I2C Master
-  i2c_config_t i2c_master_conf = 
-  {
-    .mode           = I2C_MODE_MASTER,
-    .sda_io_num     = I2C_MASTER_SDA_PIN,
-    .scl_io_num     = I2C_MASTER_SCL_PIN,
-    .sda_pullup_en  = GPIO_PULLUP_ENABLE,
-    .scl_pullup_en  = GPIO_PULLUP_ENABLE,
-    .master         = 
-    { 
-      .clk_speed    = I2C_MASTER_FREQ_HZ, 
-    },
-  };
-
-  ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &i2c_master_conf));
-  ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0, 0, 0));
+  // // Initialize I2C Master
+  // i2c_config_t i2c_master_conf = {
+  //   .mode          = I2C_MODE_MASTER,
+  //   .sda_io_num    = I2C_MASTER_SDA_PIN,
+  //   .scl_io_num    = I2C_MASTER_SCL_PIN,
+  //   .sda_pullup_en = GPIO_PULLUP_ENABLE,
+  //   .scl_pullup_en = GPIO_PULLUP_ENABLE,
+  //   .master        = { 
+  //     .clk_speed   = I2C_MASTER_FREQ_HZ, 
+  //   },
+  // };
+  // ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &i2c_master_conf));
+  // ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0, 0, 0));
+  //
+  // ESP_LOGI(TAG, "I2C INITED SUCCESFULLY!!!");
 
   // Start watchdog task
   res = MiserSysMon::start();
   if (res != ESP_OK)
     ESP_LOGE(TAG, "Failed to create system watchdog task: %s", esp_err_to_name(res));
 
+  // Init NVS flash
   esp_err_t flash_res = nvs_flash_init();
   ESP_ERROR_CHECK(flash_res);
   if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || ESP_ERR_NVS_NEW_VERSION_FOUND) {
     nvs_flash_erase();
-    nvs_flash_init();
+    nvs_flash_init(); // huh? hail mary?
   }
 
+  // Init netif networking
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   esp_netif_create_default_wifi_sta();
 
+  // Init WIFI
   ESP_ERROR_CHECK(g_wifihandler.wifi_init());
 
   // Start display (maybe make part of ui init or keep separate?)
