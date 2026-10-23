@@ -3,7 +3,7 @@
 #include "esp_err.h"
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 // #include "uart_queue.hpp"
 
 #include "http_client.hpp"
@@ -203,9 +203,9 @@ void LeopFetcher::leop_fetch_task(void* param)
     return;
   }
 
-  // Local copy of ui data
-  UiQueue::Data UiD;
-  data_leop_init(&UiD.leop);
+  // Local copy of queue data
+  DataQueue::Data Qd;
+  data_leop_init(&Qd.leop);
 
   while (1) 
   {
@@ -227,8 +227,8 @@ void LeopFetcher::leop_fetch_task(void* param)
     // --- Send new parsed data to UI Queue
     // Mock sending data over queue to ui
     srand(time(NULL));
-    UiD.type = DATA_LEOP;
-    UiD.leop.price = (float)rand() / RAND_MAX;
+    Qd.type = DATA_LEOP;
+    Qd.leop.price = (float)rand() / RAND_MAX;
     ESP_LOGI(TAG, "Sending %f to queue.", UiD.leop.price);
 
     // Send to consumer queues
