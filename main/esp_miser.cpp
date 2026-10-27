@@ -3,7 +3,7 @@
 #include "task_priorities.hpp"
 #include "sysmon_task.hpp"
 #include "display.hpp"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
@@ -53,12 +53,15 @@ extern "C" void app_main(void)
     nvs_flash_init();
   }
 
-
   ESP_ERROR_CHECK(esp_netif_init());
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   esp_netif_create_default_wifi_sta();
 
   ESP_ERROR_CHECK(g_wifihandler.wifi_init());
+
+  // Start shared data queue
+  if (DataQueue::init() > 0)
+    ESP_LOGE(TAG, "Failed creating data queue, tasks that depend on it will fail");
 
   // Start display (maybe make part of ui init or keep separate?)
   task_result = xTaskCreate( 
@@ -73,7 +76,6 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create display task");
 
   // Start UI
-  UiQueue::init(); // Create queue
   task_result = xTaskCreate(
     Ui::ui_task,
     "ui_task",

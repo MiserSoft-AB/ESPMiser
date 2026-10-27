@@ -33,7 +33,8 @@ typedef enum
   DATA_ALL,
   DATA_LEOP,
   DATA_SENSOR,
-  // DATA_SYSTEM,
+  DATA_SYSTEM,
+  DATA_WIFI,
   DATA_NONE,
 
 } DataStructType; 
