@@ -1,50 +1,35 @@
 #include "ui_task.hpp"
 #include "data.h"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
+#include "freertos/projdefs.h"
 #include <esp_log.h>
 
 static const char* TAG = "ui_task";
 
 void Ui::ui_task(void* param) {
-  // Local copy of ui data
-  Ui_Data UiD;
-  ui_data_init(&UiD);
-  
+  // Local copy of queue data
+  DataQueue::Data Qd;
+  data_leop_init(&Qd.leop);
+  data_sensor_init(&Qd.sensor);
+  data_wifi_init(&Qd.wifi);
 
   while (true) {
-    // Block until data arrives, timeout after 100ms
-    if (UiQueue::receive(UiD, pdMS_TO_TICKS(100)) == 0) 
+    // Refresh local data copy from data queue
+    if (DataQueue::get(&Qd, pdMS_TO_TICKS(100)) == 0) 
+      // Might just want to use software timer and pass zero timeout to queue for a try-lock
     {
-      switch (UiD.type) 
-      {
-        case UI_NO_DATA:
-          ESP_LOGI(TAG, "Data recieved but no type specified");
-          break;
-        case UI_LEOP_DATA:
-          ESP_LOGI(TAG, "Leop Data recieved: %f", UiD.leop_data.price);
-          break;
-        case UI_SENSOR_DATA:
-          ESP_LOGI(TAG, "Sensors Data recieved: temp: %f, humidity: %f, press: %f.", 
-            UiD.sensor_data.temperature,
-            UiD.sensor_data.pressure,
-            UiD.sensor_data.humidity
-          );
-          break;
-        case UI_ALL_DATA:
-          ESP_LOGI(TAG, "All data recieved! price: %ftemp: %f, humidity: %f, press: %f.", 
-            UiD.leop_data.price,
-            UiD.sensor_data.temperature,
-            UiD.sensor_data.pressure,
-            UiD.sensor_data.humidity
-          );
-      }
+      
+      // ESP_LOGI(TAG, "UI data updated! price: %f temp: %f, humidity: %f, press: %f.", 
+      //   Qd.leop.price,
+      //   Qd.sensor.temperature,
+      //   Qd.sensor.pressure,
+      //   Qd.sensor.humidity
+      // );
     }
+    else
+      ESP_LOGW(TAG, "Failed to get data from queue");
     
-    // NOTE: Only the last recieved data is recent for certain here on out 
-    // Should maybe handle type-specific stuff inside the switch
-
-    
-    // No delay yolo (queue recieve should be enough)
+    // vTaskDelay(100);
   }
 }
 

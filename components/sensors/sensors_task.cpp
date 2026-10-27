@@ -1,6 +1,6 @@
 #include "sensors_task.hpp"
 #include "esp_err.h"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 
 // TODO: replace all bme280 specific shit with HAL equivalents
 #include "bme280.hpp"
@@ -52,9 +52,9 @@ esp_err_t Sensors::timer_setup(int timeout_ms)
 // Static task
 void Sensors::sensors_task(void* self) 
 {
-  // Local copy of ui data
-  Ui_Data UiD;
-  ui_data_init(&UiD);
+  // Local copy of queue data
+  DataQueue::Data Qd{};
+  Qd.type = DATA_SENSOR;
 
   Sensors* This = (Sensors*)self;
   if (!This)
@@ -81,8 +81,7 @@ void Sensors::sensors_task(void* self)
       // Mock sending sensor read data over queue to ui
       srand(time(NULL));
 
-      UiD.type = UI_SENSOR_DATA;
-      UiD.sensor_data = {
+      Qd.sensor = {
         .temperature  = bme280_reads.temperature,
         .humidity     = bme280_reads.humidity,
         .pressure     = bme280_reads.pressure,
@@ -90,13 +89,14 @@ void Sensors::sensors_task(void* self)
         // .humidity     = (float)rand() / RAND_MAX,
         // .pressure     = (float)rand() / RAND_MAX,
       };
-      ESP_LOGI(TAG, "Sending temp: %f, humidity: %f, press: %f to queue.", 
-        UiD.sensor_data.temperature,
-        UiD.sensor_data.pressure,
-        UiD.sensor_data.humidity
-      );
 
-      UiQueue::send(UiD);
+      // ESP_LOGI(TAG, "Sending temp: %f, humidity: %f, press: %f to queue.", 
+      //   Qd.sensor.temperature,
+      //   Qd.sensor.pressure,
+      //   Qd.sensor.humidity
+      // );
+
+      DataQueue::send(Qd);
     }
     else
       ESP_LOGE(TAG, "Semaphore timed out, ensure timer is started!");

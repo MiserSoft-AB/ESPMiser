@@ -2,7 +2,7 @@
 #include "task_priorities.hpp"
 #include "sysmon_task.hpp"
 #include "display.hpp"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
@@ -28,9 +28,9 @@ static const char* TAG = "esp_miser";
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
 static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
 
-static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
-static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
-static Sensors     g_S;
+static WifiHandler   g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
+static LeopFetcher   g_Lf(LEOP_RESPONSE_BUF_SIZE);
+static Sensors       g_S;
 static UartInterface g_UaIf(nullptr);
 
 extern "C" void app_main(void)
@@ -42,22 +42,6 @@ extern "C" void app_main(void)
   ESP_ERROR_CHECK(esp_psram_init());
   if (!esp_psram_is_initialized()) 
     ESP_LOGW(TAG, "PSRAM not found.\n");
-
-  // // Initialize I2C Master
-  // i2c_config_t i2c_master_conf = {
-  //   .mode          = I2C_MODE_MASTER,
-  //   .sda_io_num    = I2C_MASTER_SDA_PIN,
-  //   .scl_io_num    = I2C_MASTER_SCL_PIN,
-  //   .sda_pullup_en = GPIO_PULLUP_ENABLE,
-  //   .scl_pullup_en = GPIO_PULLUP_ENABLE,
-  //   .master        = { 
-  //     .clk_speed   = I2C_MASTER_FREQ_HZ, 
-  //   },
-  // };
-  // ESP_ERROR_CHECK(i2c_param_config(I2C_MASTER_NUM, &i2c_master_conf));
-  // ESP_ERROR_CHECK(i2c_driver_install(I2C_MASTER_NUM, I2C_MODE_MASTER, 0, 0, 0));
-  //
-  // ESP_LOGI(TAG, "I2C INITED SUCCESFULLY!!!");
 
   // Start watchdog task
   res = MiserSysMon::start();
@@ -80,6 +64,10 @@ extern "C" void app_main(void)
   // Init WIFI
   ESP_ERROR_CHECK(g_wifihandler.wifi_init());
 
+  // Start shared data queue
+  if (DataQueue::init() > 0)
+    ESP_LOGE(TAG, "Failed creating data queue, tasks that depend on it will fail");
+
   // Start display (maybe make part of ui init or keep separate?)
   task_result = xTaskCreate( 
     display_task,
@@ -93,7 +81,6 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create display task");
 
   // Start UI
-  UiQueue::init(); // Create queue
   task_result = xTaskCreate(
     Ui::ui_task,
     "ui_task",
