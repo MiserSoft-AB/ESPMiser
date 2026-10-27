@@ -1,6 +1,6 @@
 #include "uart_interface.hpp"
 #include "board_config.h"
-#include "driver/uart.h"
+#include "data.h"
 
 #include <esp_log.h>
 
@@ -93,8 +93,12 @@ void UartInterface::uart_interface_task(void* param)
 
   while (1)
   {
+
     // uart_write_bytes(UART_PORT, "Hello\n", 7);
     // vTaskDelay(pdMS_TO_TICKS(500));
+
+    if (This->update_data() != ESP_OK)
+      ESP_LOGW(TAG, "Failed to update data");
 
     // Read input
     read_len = uart_read_bytes(
@@ -107,34 +111,124 @@ void UartInterface::uart_interface_task(void* param)
     // Handle input
     if (read_len > 0)
     {
+      i = 0; // Reset chunk len
       // Echo feedback
-      uart_write_bytes(UART_PORT, (char *)This->read_buf_, read_len);
+      // uart_write_bytes(UART_PORT, (char *)This->read_buf_, read_len);
 
-
-      // Loop through each char and feed line_buf until newline
+      // Loop through each char and feed line_buf until newline or overflow
       for (; i < read_len; i++)
       {
-        cmd_len++;
         c = This->read_buf_[i];
 
-        if (c == '\n' || c == '\r')
+        // Echo feedback
+        uart_write_bytes(UART_PORT, &c, 1);
+
+        if (c == '\r' || c == '\n')
         { // Finished command
-          read_line_buf[i] = '\0';
+          
+          read_line_buf[cmd_len] = '\0';
+
           // Send line_buf to cmd parser
-          // TODO: Parse input, execute from command palette and build response
-          // This should be a new function
+          Command Cmd = This->cmd_str_to_enum(read_line_buf);
+          This->cmd_palette(Cmd);
+
           i = 0, cmd_len = 0; // reset
+          read_line_buf[0] = '\0';
         }
-        else if (i < READ_LINE_BUF_LEN)
+        else if (i < READ_LINE_BUF_LEN - 1)
         { // Inputted character
-          read_line_buf[i] = c;
+          read_line_buf[cmd_len++] = c;
         }
         else
         { // Buffer overflow
           ESP_LOGW(TAG, "Read line buffer overflowed");
           i = 0, cmd_len = 0; // reset
+          read_line_buf[0] = '\0';
         }
       }
     }
   }
 }
+
+esp_err_t UartInterface::update_data()
+{
+  if (UiQueue::receive(ui_data_, pdMS_TO_TICKS(100)) == 0) 
+  {
+    switch (ui_data_.type) 
+    {
+      case DATA_NONE:
+        ESP_LOGI(TAG, "Data recieved with type none...");
+        break;
+      case DATA_LEOP:
+        break;
+      case DATA_SENSOR:
+        break;
+      case DATA_ALL:
+      default:
+        ESP_LOGW(TAG, "Unknown data recieved");
+        break;
+    }
+  }
+  else return ESP_FAIL;
+
+  return ESP_OK;
+}
+
+void UartInterface::cmd_palette(Command Cmd)
+{
+  // Clear terminal
+  // uart_write_bytes(UART_PORT, 0, READ_LINE_BUF_LEN);
+
+  /*
+  const char* help_text = \
+                          "These are the available commands:"
+                          " HELP: Display this message"
+                          " STATUS: Get system status"
+                          " LEOP: Get leop data"
+                          " SENSOR: Get sensor readings"
+                          " CONFIG: Set config (N/A)"
+                          " WIFI: Get WiFi status";
+  uart_write_bytes(UART_PORT, help_text, strlen(help_text));
+*/
+  switch (Cmd)
+  {
+    case CMD_HELP:
+    {
+      const char* help_text = \
+                    "These are the available commands:\r\n"
+                    " HELP: Display this message\r\n"
+                    " STATUS: Get system status\r\n"
+                    " LEOP: Get leop data\r\n"
+                    " SENSOR: Get sensor readings\r\n"
+                    " CONFIG: Set config (N/A)\r\n"
+                    " WIFI: Get WiFi status\r\n";
+      uart_write_bytes(UART_PORT, help_text, strlen(help_text));
+      
+    } break;
+    case CMD_STATUS: 
+    {
+
+    } break;
+    case CMD_LEOP:   
+    {
+
+
+    } break;
+    case CMD_SENSOR: 
+    {
+
+    } break;
+    case CMD_CONFIG: 
+    {
+
+    } break;
+    case CMD_WIFI:
+    {
+
+    } break;
+    default:         
+      break;
+  }
+}
+
+
