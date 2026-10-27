@@ -1,7 +1,7 @@
 #ifndef __UART_INTERFACE_HPP__
 #define __UART_INTERFACE_HPP__
 
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 
 #include <esp_err.h>
 #include <driver/uart.h>
@@ -86,16 +86,15 @@ public:
 
   /* Executes the given command function */
   void cmd_palette(Command Cmd);
-  
 
 private:
   const uart_config_t* uart_cfg_;
 
-  // Buffer members
-  uint8_t*       read_buf_ = nullptr;
-  const uint16_t buf_size_ = 1024;
+  DataQueue::Data  data_{}; // local copy of shared data
 
-  Share_Data  ui_data_;
+  // Buffer members
+  uint8_t*         read_buf_ = nullptr;
+  const uint16_t   buf_size_ = 1024;
 
 };
 

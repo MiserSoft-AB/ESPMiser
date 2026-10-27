@@ -3,9 +3,24 @@
 #include "data.h"
 
 #include <esp_log.h>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
 
 static const char* TAG = "uart_interface";
 static const int READ_LINE_BUF_LEN = 256; // For reading input commands
+
+// Helper to format and send a response over UART
+static void uart_send(const char* fmt, ...)
+{
+  char buf[512];
+  va_list args;
+  va_start(args, fmt);
+  int len = vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  if (len > 0)
+    uart_write_bytes(UART_PORT, buf, len);
+}
 
 UartInterface::UartInterface(uart_config_t* uart_cfg) 
 {
@@ -152,79 +167,73 @@ void UartInterface::uart_interface_task(void* param)
 
 esp_err_t UartInterface::update_data()
 {
-  if (UiQueue::receive(ui_data_, pdMS_TO_TICKS(100)) == 0) 
+  if (DataQueue::get(&data_, pdMS_TO_TICKS(100)) < 0) 
   {
-    switch (ui_data_.type) 
-    {
-      case DATA_NONE:
-        ESP_LOGI(TAG, "Data recieved with type none...");
-        break;
-      case DATA_LEOP:
-        break;
-      case DATA_SENSOR:
-        break;
-      case DATA_ALL:
-      default:
-        ESP_LOGW(TAG, "Unknown data recieved");
-        break;
-    }
+    ESP_LOGE(TAG, "Failed getting data from queue");
+    return ESP_FAIL;
   }
-  else return ESP_FAIL;
 
   return ESP_OK;
 }
 
 void UartInterface::cmd_palette(Command Cmd)
 {
-  // Clear terminal
-  // uart_write_bytes(UART_PORT, 0, READ_LINE_BUF_LEN);
-
-  /*
-  const char* help_text = \
-                          "These are the available commands:"
-                          " HELP: Display this message"
-                          " STATUS: Get system status"
-                          " LEOP: Get leop data"
-                          " SENSOR: Get sensor readings"
-                          " CONFIG: Set config (N/A)"
-                          " WIFI: Get WiFi status";
-  uart_write_bytes(UART_PORT, help_text, strlen(help_text));
-*/
   switch (Cmd)
   {
     case CMD_HELP:
     {
-      const char* help_text = \
-                    "These are the available commands:\r\n"
-                    " HELP: Display this message\r\n"
-                    " STATUS: Get system status\r\n"
-                    " LEOP: Get leop data\r\n"
-                    " SENSOR: Get sensor readings\r\n"
-                    " CONFIG: Set config (N/A)\r\n"
-                    " WIFI: Get WiFi status\r\n";
-      uart_write_bytes(UART_PORT, help_text, strlen(help_text));
-      
+       uart_send("These are the available commands:\r\n");
+       uart_send(" HELP: Display this message\r\n");
+       uart_send(" STATUS: Get system status\r\n");
+       uart_send(" LEOP: Get leop data\r\n");
+       uart_send(" SENSOR: Get sensor readings\r\n");
+       uart_send(" CONFIG: Set config (N/A)\r\n");
+       uart_send(" WIFI: Get WiFi status\r\n");
     } break;
     case CMD_STATUS: 
     {
-
+      uart_send("=== SYSTEM STATUS ===\r\n");
+      uart_send("Error Flag : %s\r\n", data_.system.sys_status.error_flag ? "SET" : "CLEAR");
+      uart_send("WDT Enabled: %s\r\n", data_.system.sys_status.wdt_enabled ? "YES" : "NO");
+      uart_send("WiFi Enable: %s\r\n", data_.system.sys_status.wifi_enabled ? "YES" : "NO");
+      uart_send("LEOP Conn  : %s\r\n", data_.system.sys_status.leop_conn ? "CONNECTED" : "DISCONNECTED");
+      uart_send("Sensor Conn: %s\r\n", data_.system.sys_status.sensor_conn ? "CONNECTED" : "DISCONNECTED");
+      uart_send("CPU Temp   : %.2f C\r\n", (double)data_.system.temp_cpu);
+#ifdef TASK_DIAG_ENABLED
+      uart_send("--- Tasks (%d) ---\r\n", (int)data_.system.tasks_n);
+      for (size_t i = 0; i < data_.system.tasks_n && i < SYSTEM_DATA_MAX_TASKS; i++)
+      {
+        const Task_Data* t = &data_.system.tasks[i];
+        uart_send(" [%d] %-16s stack=%u words state=%d cpu=%u%%\r\n",
+                  (int)i,
+                  t->name ? t->name : "(null)",
+                  (unsigned int)t->stack_words_remaining,
+                  (int)t->state,
+                  (unsigned int)t->cpu_usage_pct);
+      }
+#endif // TASK_DIAG_ENABLED
     } break;
     case CMD_LEOP:   
     {
-
-
+      uart_send("=== LEOP DATA ===\r\n");
+      uart_send("Price: %.2f\r\n", (double)data_.leop.price);
     } break;
     case CMD_SENSOR: 
     {
-
+      uart_send("=== SENSOR DATA ===\r\n");
+      uart_send("Temperature: %.2f C\r\n", (double)data_.sensor.temperature);
+      uart_send("Humidity   : %.2f %%\r\n", (double)data_.sensor.humidity);
+      uart_send("Pressure   : %.2f hPa\r\n", (double)data_.sensor.pressure);
     } break;
     case CMD_CONFIG: 
     {
-
+      uart_send("CONFIG: Not yet implemented\r\n");
     } break;
     case CMD_WIFI:
     {
-
+      uart_send("=== WIFI DATA ===\r\n");
+      uart_send("SSID    : %s\r\n", data_.wifi.ap_ssid ? data_.wifi.ap_ssid : "(none)");
+      uart_send("Connected: %s\r\n", data_.wifi.ap_connected ? "YES" : "NO");
     } break;
     default:         
       break;
