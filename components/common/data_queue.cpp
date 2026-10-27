@@ -1,112 +1,159 @@
 #include "data_queue.hpp"
+#include "data.h"
 
 #include <esp_log.h>
 
 static const char* TAG = "data_queue";
 
-/* Global statics */
-static DataQueue::Data   g_data;
-static SemaphoreHandle_t g_data_mutex = nullptr;
-static QueueHandle_t     g_queue      = nullptr;
+// .bss statics
+static DataQueue::Data    g_data{};
+static QueueHandle_t      g_queue  = nullptr;
+static SemaphoreHandle_t  g_mutex  = nullptr;
+static volatile bool      g_ready  = false; // if inited
 
-// DataQueue::DataQueue() 
-// {
-//   if (g_queue == nullptr) 
-//   {
-//     g_queue = xQueueCreate(QUEUE_LENGTH, ITEM_SIZE);
-//     // Do we know if it fails? Can it fail?
-//   }
-// }
-// DataQueue::~DataQueue() {}
-
-void DataQueue::data_queue_task(void* param)
+int DataQueue::init() 
 {
+  if (g_queue != nullptr) 
+    return -1; // Already initialized
 
-  // Init queue
+  g_queue = xQueueCreate(QUEUE_LENGTH, ITEM_SIZE);
   if (g_queue == nullptr) 
   {
-    g_queue = xQueueCreate(QUEUE_LENGTH, ITEM_SIZE);
-    if (g_queue == nullptr)
-    {
-      ESP_LOGE(TAG, "Failed to create global data queue");
-      return;
-    }
+    ESP_LOGE(TAG, "Failed to create data queue");
+    return 1; // xQueueCreate
   }
 
-  while (true)
+  g_mutex = xSemaphoreCreateMutex();
+  if (g_mutex == nullptr) 
   {
-    if (xSemaphoreTake(g_data_mutex, portMAX_DELAY))
+    ESP_LOGE(TAG, "Failed to create data mutex");
+    vQueueDelete(g_queue);
+    g_queue = nullptr;
+    return 2; // xSemaphoreCreateMutex
+  }
+
+  // Start merge task: drains queue and updates snapshot under lock
+  TaskHandle_t task_handle = nullptr;
+  if (xTaskCreate(
+        data_queue_task,
+        "data_q_task",
+        2048,
+        nullptr,
+        5,
+        &task_handle) 
+      != pdPASS) 
+  {
+    ESP_LOGE(TAG, "Failed to create data queue task");
+    vSemaphoreDelete(g_mutex);
+    g_mutex = nullptr;
+    vQueueDelete(g_queue);
+    g_queue = nullptr;
+    return 4;
+  }
+  
+  g_ready = true;
+  return 0;
+}
+
+void DataQueue::data_queue_task(void* param) 
+{
+  (void)param;
+
+  DataQueue::Data item; // queue item
+  while (true) 
+  {
+    // Block until a producer sends something
+    if (xQueueReceive(g_queue, &item, pdMS_TO_TICKS(100)) != pdPASS) 
+      continue;
+
+    if (xSemaphoreTake(g_mutex, pdMS_TO_TICKS(50)) != pdPASS) 
     {
-      xQueueReceive(g_queue, &g_data, 100);
-      xSemaphoreGive(g_data_mutex);
+      ESP_LOGW(TAG, "Something's blocking the mutex...");
+      continue; // Should never happen
     }
+
+    switch (item.type)
+    {
+      case DATA_ALL:
+        g_data = item; 
+        break;
+      case DATA_SYSTEM:
+        g_data.system = item.system;
+        break;
+      case DATA_WIFI:
+        g_data.wifi = item.wifi;
+        break;
+      case DATA_LEOP:
+        g_data.leop = item.leop;
+        break;
+      case DATA_SENSOR:
+        g_data.sensor = item.sensor;
+        break;
+      case DATA_NONE:
+        break;
+      default: break;
+    }
+
+    // g_data.wifi   = item.wifi;
+    // g_data.leop   = item.leop;
+    // g_data.sensor = item.sensor;
+
+    xSemaphoreGive(g_mutex);
   }
 }
 
-int DataQueue::send(Data const& data, DataStructType type) 
+int DataQueue::send(Data const& data) 
 {
-  if (g_queue == nullptr) 
-    return 1;
+  if (g_queue == nullptr || !g_ready) 
+    return 1; // Not initialized yet
 
-  if (xSemaphoreTake(g_data_mutex, portMAX_DELAY) != pdPASS)
+  // Queue send is the only synchronization needed here:
+  // producers never touch g_data directly, so no mutex required.
+  if (xQueueSend(g_queue, &data, pdMS_TO_TICKS(50)) != pdPASS) 
+  {
+    ESP_LOGW(TAG, "Data queue full, dropping stale update (type %d)", (int)data.type);
     return 2;
-
-  // Save the recieved data to global
-  // Logs not good idea inside semaphore, but their cases shouldn't happen during normal usage
-  switch (type) 
-  {
-    case DATA_NONE:
-      ESP_LOGW(TAG, "Data recieved with type none...");
-      break;
-    case DATA_LEOP:
-      g_data.leop.price = data.leop.price;
-      // ESP_LOGI(TAG, "Leop Data recieved: %f", g_data.leop.price);
-      break;
-    case DATA_SENSOR:
-      g_data.sensor.temperature = data.sensor.temperature;
-      g_data.sensor.pressure    = data.sensor.pressure;
-      g_data.sensor.humidity    = data.sensor.humidity;
-
-      // ESP_LOGI(TAG, "Sensors Data recieved: temp: %f, humidity: %f, press: %f.", 
-      //     g_data.sensor.temperature,
-      //     g_data.sensor.pressure,
-      //     g_data.sensor.humidity
-      // );
-      break;
-    case DATA_ALL:
-      g_data.leop.price         = data.leop.price;
-      g_data.sensor.temperature = data.sensor.temperature;
-      g_data.sensor.pressure    = data.sensor.pressure;
-      g_data.sensor.humidity    = data.sensor.humidity;
-
-      // ESP_LOGI(TAG, "All data recieved! price: %f temp: %f, humidity: %f, press: %f.", 
-      //   g_data.leop.price,
-      //   g_data.sensor.temperature,
-      //   g_data.sensor.pressure,
-      //   g_data.sensor.humidity
-      // );
-    default:
-      ESP_LOGW(TAG, "Unknown data recieved");
-      break;
   }
-  if (xQueueSend(g_queue, &data, portMAX_DELAY) != pdPASS)
-  {
-    xSemaphoreGive(g_data_mutex);
-    return 3;
-  }
-  xSemaphoreGive(g_data_mutex);
 
   return 0;
 }
 
-DataQueue::Data DataQueue::get() 
+int DataQueue::get(Data* out, TickType_t timeout)
 {
-  if (xSemaphoreTake(g_data_mutex, portMAX_DELAY) != pdPASS)
+  if (out == nullptr || g_mutex == nullptr || !g_ready) 
+    return 1;
+
+  if (xSemaphoreTake(g_mutex, timeout) != pdPASS) 
   {
     ESP_LOGW(TAG, "Data mutex timed out");
-    return g_data;
+    return 2;
   }
-  Data Out = g_data;
-  xSemaphoreGive(g_data_mutex);
-  return Out;
+
+  // Copy the wanted data from global to out pointer
+  switch (out->type)
+  {
+    case DATA_ALL:
+      *out = g_data;
+      break;
+    case DATA_SYSTEM:
+      (*out).system = g_data.system;
+      break;
+    case DATA_WIFI:
+      (*out).wifi = g_data.wifi;
+      break;
+    case DATA_LEOP:
+      (*out).leop = g_data.leop;
+      break;
+    case DATA_SENSOR:
+      (*out).sensor = g_data.sensor;
+      break;
+    case DATA_NONE:
+      break;
+    default:
+      break;
+  }
+
+  xSemaphoreGive(g_mutex);
+  return 0;
 }
+

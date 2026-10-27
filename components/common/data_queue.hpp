@@ -1,5 +1,5 @@
-#ifndef __DATA_UPDATER_HPP__
-#define __DATA_UPDATER_HPP__
+#ifndef __DATA_QUEUE_HPP__
+#define __DATA_QUEUE_HPP__
 
 /* Component for producers to send common data 
  * and "consumers" to get produced data */
@@ -15,49 +15,36 @@
 class DataQueue 
 {
 public:
-  // Mybe better to typedef this and put it in data.h as Queue_Data?
   struct Data
   {
-    // System_Data    system;
+    System_Data    system;
     Wifi_Data      wifi;
     Leop_Data      leop;
     Sensor_Data    sensor;
+
+    DataStructType type;
   };
 
   static const int    QUEUE_LENGTH = 16; // TODO: optimize perfect size
-  static const size_t ITEM_SIZE = sizeof(Data);
+  static const size_t ITEM_SIZE    = sizeof(Data);
 
-  // Creates the queue
-  // DataQueue();
-  // ~DataQueue();
-  //
-  // // No copy, no move
-  // DataQueue(const DataQueue&) = delete;
-  // DataQueue& operator=(const DataQueue&) = delete;
-  // DataQueue(DataQueue&&) noexcept = delete;
-  // DataQueue& operator=(DataQueue&&) noexcept = delete;
+  // Initialize the queue, mutex and merge task. Call once from app_main.
+  static int init();
 
-  // Task function continuously reads from queue
-  // Pass pointer to TickType_t to set recieve interval 
-  static void data_queue_task(void* param);
+  // Called by producers to set data.
+  // Only data specified by in member 'type' will be copied
+  static int send(Data const& in);
 
-  // Called by producers to set data
-  // Returns 1 on invalid state, 2 on mutex failure, 3 on sending failure
-  static int send(Data const& data, DataStructType type);
-
-  // Returns copy of current Data object
-  static Data get();
-
-  // Optional: Check if data is available without blocking
-  // static bool hasData() {
-  //     if (queue == nullptr) return false;
-  //     return uxQueueMessagesWaiting(queue) > 0;
-  // }
+  // Copies the current merged snapshot into out.
+  // Only data specified by out member 'type' will be copied
+  // Timeout sets how long to wait for mutex, set 0 for a try-lock if blocking is unacceptable
+  static int get(Data* out, TickType_t timeout);
 
 private:
-  // static Data   q_buf_[QUEUE_LENGTH];
-  DataQueue() {};
+  DataQueue() {}; // No instantiation
 
+  // Task function continuously reads from queue and merges into snapshot
+  static void data_queue_task(void* param);
 };
 
-#endif // __DATA_UPDATER_HPP__
+#endif // __DATA_QUEUE_HPP__
