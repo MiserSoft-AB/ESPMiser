@@ -18,27 +18,14 @@ Pin assignment:
 
 esp_err_t Bme280::init()
 {
-  // Init i2c bus
-  // Make more modular, pass conf as arg?
-  i2c_config_t i2c_conf = {
-      .mode          = I2C_MODE_MASTER,
-      .sda_io_num    = I2C_MASTER_SDA_PIN,
-      .scl_io_num    = I2C_MASTER_SCL_PIN,
-      .sda_pullup_en = GPIO_PULLUP_ENABLE,
-      .scl_pullup_en = GPIO_PULLUP_ENABLE,
-      .master        = { 
-        .clk_speed = I2C_MASTER_FREQ_HZ, 
-      },
-  };
-  i2c_bus_ = i2c_bus_create(I2C_MASTER_NUM, &i2c_conf);
-  if (!i2c_bus_)
+  i2c_bus_handle_t i2c_bus = board_i2c_bus_get();
+  if (!i2c_bus)
   {
-    ESP_LOGE(TAG, "Failed to create i2c bus");
+    ESP_LOGE(TAG, "Global i2c bus not created");
     return ESP_FAIL;
   }
-
-  // Init bme280
-  bme280_ = bme280_create(i2c_bus_, I2C_ADDR_BME280);
+  
+  bme280_ = bme280_create(i2c_bus, I2C_ADDR_BME280);
   if (!bme280_)
   {
     ESP_LOGE(TAG, "Failed to create bme280 handle");

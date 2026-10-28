@@ -7,6 +7,7 @@
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
 #include "uart_interface.hpp"
+#include "board_config.h"
 
 #include <esp_psram.h>
 #include <portmacro.h>
@@ -67,6 +68,10 @@ extern "C" void app_main(void)
   // Start shared data queue
   if (DataQueue::init() > 0)
     ESP_LOGE(TAG, "Failed creating data queue, tasks that depend on it will fail");
+
+  // Init global i2c bus
+  if (board_i2c_bus_init(NULL) != ESP_OK)
+    ESP_LOGE(TAG, "Failed to init global i2c bus, tasks using i2c master will fail");
 
   // Start display (maybe make part of ui init or keep separate?)
   task_result = xTaskCreate( 

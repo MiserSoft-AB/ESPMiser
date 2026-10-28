@@ -24,7 +24,7 @@ public:
   Bme280(Bme280&&) noexcept = delete;
   Bme280& operator=(Bme280&&) noexcept = delete;
 
-  // Inits the i2c bus for bme280 sensors
+  // Inits the bme280 sensors, requires existing i2c bus handle
   esp_err_t init();
 
   // Read from sensors and return the results
@@ -32,9 +32,7 @@ public:
 
 private:
 
-  i2c_bus_handle_t i2c_bus_ = NULL;
   bme280_handle_t  bme280_  = NULL;
-
   Readings readings_ = { 0.0, 0.0, 0.0 };
 
 };

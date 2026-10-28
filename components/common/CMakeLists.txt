@@ -1,4 +1,5 @@
 idf_component_register(
-  SRCS "data_queue.cpp"
+  SRCS "board_config.cpp" "data_queue.cpp"
   INCLUDE_DIRS "."
+  REQUIRES i2c_bus
 )
