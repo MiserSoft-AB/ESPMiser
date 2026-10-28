@@ -42,7 +42,7 @@
 # Build directories
 build/
 Build/
-build-*/
+build*/
 
 # CMake generated files
 CMakeFiles/
@@ -59,6 +59,7 @@ compile_commands.json
 *.tmp
 *.log
 *.bak
+*.bk
 *.swp
 
 # vcpkg
@@ -73,3 +74,6 @@ Testing/
 .vscode
 sdkconfig
 sdkconfig.old
+
+# espressif stuff
+managed_components/
