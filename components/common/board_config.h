@@ -14,6 +14,25 @@ extern "C" {
 #define UART_TX_PIN 43
 #define UART_RX_PIN 44
 
+/*------------------- I2C Config --------------------*/
+#define BOARD_I2C_SDA_PIN 8
+#define BOARD_I2C_SCL_PIN 9
+
+/*------------------- LCD Config --------------------*/
+#define LCD_H_RES 1024
+#define LCD_V_RES 600
+
+#define LCD_HSYNC_PIN 46
+#define LCD_VSYNC_PIN 3
+#define LCD_DE_PIN 5
+#define LCD_PCLK_PIN 7
+
+/* RGB565 data pins, ordered from D0 to D15 */
+#define LCD_DATA_PINS { \
+    14, 38, 18, 17, 10, \
+    39, 0, 45, 48, 47, 21, \
+    1, 2, 42, 41, 40 \
+}
 
 #ifdef __cplusplus
 } // extern "C"
