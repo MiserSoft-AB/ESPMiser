@@ -1,9 +1,12 @@
 #include "sysmon_task.hpp"
-// #include "esp_log_level.h"
-#include "esp_err.h"
-#include "freertos/idf_additions.h"
+// #include "ui_queue.hpp"
+// #include "uart_queue.hpp"
 
-#include "esp_chip_info.h"
+
+// #include <esp_log_level.h>
+#include <esp_err.h>
+#include <freertos/idf_additions.h>
+#include <esp_chip_info.h>
 
 static const char* TAG = "sysmon";
 static const size_t MAX_TASKS = 16;
@@ -105,7 +108,9 @@ void MiserSysMon::run()
     (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? " SD Flash" : "",
     (chip_info.features & CHIP_FEATURE_BT) ? " Bluetooth" : "");
 
-  ESP_LOGI(TAG, "--- ESPMiser board info --- \n%s", model_info);
+  ESP_LOGI(TAG, "--- ESPMiser board info ---\n%s", model_info);
+
+
 
   // Periodic checks
   while (true) 
@@ -122,7 +127,7 @@ void MiserSysMon::run()
     ESP_LOGI(TAG, "Heap available (bytes): %d", esp_get_free_heap_size());
 
     // 3. Inspect Task Stacks 
-    // NOTE: is expensive, potentially remove if overhead is needed
+#ifdef TASK_DIAG_ENABLED
     static TaskStatus_t tasks[MAX_TASKS];
     UBaseType_t task_count = uxTaskGetNumberOfTasks();
     ESP_LOGI(TAG, "Tasks managed by FreeRTOS: %d", (unsigned)task_count);
@@ -154,6 +159,7 @@ void MiserSysMon::run()
       // Debug log task names
       ESP_LOGI(TAG, "Task %i: %s", i, tasks[i].pcTaskName);
     }
+#endif // TASK_DIAG_ENABLED
     // 4. WiFi Status ?
 
     // 5. Get silicon temperature

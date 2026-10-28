@@ -58,7 +58,9 @@ The `-p` option tells ESP-IDF which serial port to use.
 
 > **Note:** These flashing instructions have not yet been verified as the ESP32-S3 hardware is not currently available at the time of writing.
 
+## Known limitations
 
+When connecting to WIFI make sure it is on a 2.4Ghz band, since the device doesn't support wifi over 5ghz.
 
 
 
