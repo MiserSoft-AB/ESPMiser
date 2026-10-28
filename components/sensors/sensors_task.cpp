@@ -1,6 +1,7 @@
 #include "sensors_task.hpp"
 #include "esp_err.h"
 #include "ui_queue.hpp"
+#include "esp_task_wdt.h"
 
 #include <esp_log.h>
 #include <time.h>
@@ -51,9 +52,25 @@ void Sensors::sensors_task(void* self)
   Ui_Data UiD;
   ui_data_init(&UiD);
 
-  Sensors* This = (Sensors*)self;
+  Sensors* This = static_cast<Sensors*>(self);
+
   if (!This)
-    vTaskDelete(NULL);
+  {
+    ESP_LOGE(TAG, "Invalid parameter passed to sensor task");
+    vTaskDelete(nullptr);
+    return;
+  }
+
+  // Register this task with the Task Watchdog Timer (WDT)
+  esp_err_t wdt_result = esp_task_wdt_add(nullptr);
+
+  if (wdt_result != ESP_OK)
+  {
+    ESP_LOGE(TAG, "Failed to register sensor task with TWDT: %s", esp_err_to_name(wdt_result));
+
+    vTaskDelete(nullptr);
+    return;
+  }
 
   while (1) 
   {
@@ -78,6 +95,16 @@ void Sensors::sensors_task(void* self)
       UiQueue::send(UiD);
     }
     else
+    {
       ESP_LOGE(TAG, "Semaphore timed out, ensure timer is started!");
+    }
+
+    // tell the watchdog that the sensor task is still responsive
+    wdt_result = esp_task_wdt_reset();
+
+    if (wdt_result != ESP_OK)
+    {
+      ESP_LOGE(TAG, "Failed to reset sensor TWDT: %s", esp_err_to_name(wdt_result));
+    }
   }
 }

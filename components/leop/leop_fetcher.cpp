@@ -1,6 +1,7 @@
 #include "leop_fetcher.hpp"
 #include "data.h"
 #include "esp_err.h"
+#include "esp_task_wdt.h"
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
 #include "ui_queue.hpp"
@@ -206,6 +207,20 @@ void LeopFetcher::leop_fetch_task(void* param)
   Ui_Data UiD;
   ui_data_init(&UiD);
 
+  // Register this task with the Task Watchdog Timer (WDT)
+  res = esp_task_wdt_add(nullptr);
+
+  if (res != ESP_OK)
+  {
+    ESP_LOGE(TAG, "Failed to register network task with TWDT: %s", esp_err_to_name(res));
+
+    vTaskDelete(nullptr);
+    return;
+  }
+
+  // Reset the watchdog once per second while waiting
+  const TickType_t twdt_feed_interval = pdMS_TO_TICKS(1000); // 1 second
+
   while (1) 
   {
     ESP_LOGI(TAG, "Fetching LEOP data...");
@@ -232,10 +247,46 @@ void LeopFetcher::leop_fetch_task(void* param)
 
     UiQueue::send(UiD);
 
-    if (This->gptimer_enabled_) // Wait for GPTIMER signal
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-    else // Fallback to regular delay if timer failed to start is is still starting up
-      vTaskDelay(pdMS_TO_TICKS(This->timer_interval_ms_)); 
+    // The network task completed another iteration
+    res = esp_task_wdt_reset();
+
+    if (res != ESP_OK)
+    {
+      ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+    }
+
+    if (This->gptimer_enabled_)
+    {
+      // Wait for the timer notification in one second sections
+      while (ulTaskNotifyTake(pdTRUE, twdt_feed_interval) == 0)
+      {
+        res = esp_task_wdt_reset();
+
+        if (res != ESP_OK)
+        {
+          ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+        }
+      }
+    }
+    else
+    {
+      // Fallback: divide the full delay into one second sections
+      TickType_t remaining_ticks = pdMS_TO_TICKS(This->timer_interval_ms_);
+
+      while (remaining_ticks > 0)
+      {
+        const TickType_t wait_ticks = remaining_ticks > twdt_feed_interval ? twdt_feed_interval : remaining_ticks;
+
+        vTaskDelay(wait_ticks);
+        remaining_ticks -= wait_ticks;
+
+        res = esp_task_wdt_reset();
+
+        if (res != ESP_OK)
+        {
+          ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+        }
+      }
+    }
   }
 }
-
