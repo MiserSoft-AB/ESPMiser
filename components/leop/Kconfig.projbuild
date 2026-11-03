@@ -15,5 +15,11 @@ menu "LEOP Server"
         help
             Name of facility on the LEOP server where data should be fetched from.
 
+    config LEOP_DATA_RETRIEVAL_FREQUENCY
+        int "LEOP_DATA_RETRIEVAL_FREQUENCY"
+        range 1 60
+        default 15
+        help
+            How often the LEOP-data should get fetched in minutes.
 
 endmenu

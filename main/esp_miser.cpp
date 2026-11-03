@@ -1,4 +1,5 @@
 #include "http_client.hpp"
+#include "sdkconfig.h"
 #include "wifi.hpp"
 #include "task_priorities.hpp"
 #include "sysmon_task.hpp"
@@ -24,12 +25,12 @@
 static const char* TAG = "esp_miser";
 
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
-static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
+static const size_t LEOP_FETCH_INTERVAL_MS = CONFIG_LEOP_DATA_RETRIEVAL_FREQUENCY * 60 * 1000; // How often LEOP gptimer triggers
 
-static WifiHandler g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
-static LeopFetcher g_Lf(LEOP_RESPONSE_BUF_SIZE);
-static Sensors     g_S;
-static UartInterface g_UaIf(nullptr);
+static WifiHandler    g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
+static LeopFetcher    g_Lf(LEOP_RESPONSE_BUF_SIZE);
+static Sensors        g_S;
+static UartInterface  g_UaIf(nullptr);
 
 extern "C" void app_main(void)
 {
@@ -37,9 +38,9 @@ extern "C" void app_main(void)
   BaseType_t task_result;
 
   // Initialize PSRAM
+  ESP_LOGI(TAG, "Checking for PSRAM...");
   ESP_ERROR_CHECK(esp_psram_init());
-  if (!esp_psram_is_initialized()) 
-    ESP_LOGW(TAG, "PSRAM not found.\n");
+  ESP_LOGI(TAG, "PSRAM detected!");
 
   // Start watchdog task
   res = MiserSysMon::start();
@@ -48,7 +49,7 @@ extern "C" void app_main(void)
 
   esp_err_t flash_res = nvs_flash_init();
   ESP_ERROR_CHECK(flash_res);
-  if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || ESP_ERR_NVS_NEW_VERSION_FOUND) {
+  if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || flash_res == ESP_ERR_NVS_NEW_VERSION_FOUND) {
     nvs_flash_erase();
     nvs_flash_init();
   }
