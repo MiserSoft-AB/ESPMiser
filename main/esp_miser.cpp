@@ -29,6 +29,7 @@ static const char* TAG = "esp_miser";
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
 static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
 
+static Display       g_Display;
 static WifiHandler   g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher   g_Lf(LEOP_RESPONSE_BUF_SIZE);
 static Sensors       g_S;
@@ -73,17 +74,22 @@ extern "C" void app_main(void)
   if (board_i2c_bus_init(NULL) != ESP_OK)
     ESP_LOGE(TAG, "Failed to init global i2c bus, tasks using i2c master will fail");
 
-  // Start display (maybe make part of ui init or keep separate?)
-  task_result = xTaskCreate( 
-    display_task,
-    "display_task",
-    4096,
-    nullptr,
-    task_priorities::DISPLAY,
-    nullptr
-  );
-  if (task_result != pdPASS)
-    ESP_LOGE(TAG, "Failed to create display task");
+  if (g_Display.init() != ESP_OK)
+    ESP_LOGE(TAG, "Display init failed");
+  else
+  {
+    // Start display (maybe make part of ui init or keep separate?)
+    task_result = xTaskCreate( 
+      display_task,
+      "display_task",
+      4096,
+      nullptr,
+      task_priorities::DISPLAY,
+      nullptr
+    );
+    if (task_result != pdPASS)
+      ESP_LOGE(TAG, "Failed to create display task");
+  }
 
   // Start UI
   task_result = xTaskCreate(
