@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#include <i2c_bus.h>
+#include <driver/i2c_master.h>
 
 /*------------------- UART Config -------------------*/
 
@@ -18,11 +18,17 @@ extern "C" {
 
 /*------------------- I2C Config --------------------*/
 
-#define I2C_MASTER_NUM I2C_NUM_0
-#define I2C_MASTER_SDA_PIN 8
-#define I2C_MASTER_SCL_PIN 9
-#define I2C_MASTER_FREQ_HZ 400000
+#define I2C_MASTER_NUM        I2C_NUM_0
+#define I2C_MASTER_SDA_PIN    8
+#define I2C_MASTER_SCL_PIN    9
+#define I2C_MASTER_SDA_IO     GPIO_NUM_8
+#define I2C_MASTER_SCL_IO     GPIO_NUM_9
+#define I2C_MASTER_FREQ_HZ    400000
+#define I2C_MASTER_TIMEOUT_MS 1000
 
+
+
+#ifdef I2C_LEGACY_BUS_ENABLED
 // Global i2c bus handle creation
 // Pass NULL for default conf
 esp_err_t board_i2c_bus_init(const i2c_config_t* i2c_conf);
@@ -30,6 +36,11 @@ esp_err_t board_i2c_bus_init(const i2c_config_t* i2c_conf);
 // Get the global i2c bus handle if inited
 // returns NULL if not inited properly
 i2c_bus_handle_t board_i2c_bus_get();
+#endif // I2C_LEGACY_BUS_ENABLED
+
+esp_err_t board_i2c_master_init();
+i2c_master_bus_handle_t board_i2c_master_bus_get();
+bool board_i2c_master_is_ready();
 
 // Device addresses
 #define I2C_ADDR_BME280          0x77 // sensors

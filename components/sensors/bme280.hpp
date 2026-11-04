@@ -2,7 +2,7 @@
 #define __BME280_HPP__
 
 #include "board_config.h"
-#include "bme280.h" // dep: espressif/bme280
+#include "bme280_port/bme280.h" // dep: espressif/bme280
 
 
 class Bme280

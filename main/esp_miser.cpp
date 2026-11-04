@@ -21,9 +21,6 @@
 
 #include <esp_partition.h>
 
-// #include "board_config.h"
-// #include <driver/i2c.h>
-
 static const char* TAG = "esp_miser";
 
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
@@ -70,9 +67,9 @@ extern "C" void app_main(void)
   if (DataQueue::init() > 0)
     ESP_LOGE(TAG, "Failed creating data queue, tasks that depend on it will fail");
 
-  // Init global i2c bus
-  if (board_i2c_bus_init(NULL) != ESP_OK)
-    ESP_LOGE(TAG, "Failed to init global i2c bus, tasks using i2c master will fail");
+  // Init global i2c master
+  if (board_i2c_master_init() != ESP_OK)
+    ESP_LOGE(TAG, "Failed to init global i2c master, tasks that depend on it will fail");
 
   if (g_Display.init() != ESP_OK)
     ESP_LOGE(TAG, "Display init failed");
@@ -83,7 +80,7 @@ extern "C" void app_main(void)
       display_task,
       "display_task",
       4096,
-      nullptr,
+      &g_Display,
       task_priorities::DISPLAY,
       nullptr
     );

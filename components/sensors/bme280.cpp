@@ -18,14 +18,14 @@ Pin assignment:
 
 esp_err_t Bme280::init()
 {
-  i2c_bus_handle_t i2c_bus = board_i2c_bus_get();
-  if (!i2c_bus)
+  i2c_master_bus_handle_t i2c_master_bus = board_i2c_master_bus_get();
+  if (!board_i2c_master_is_ready() || !i2c_master_bus)
   {
-    ESP_LOGE(TAG, "Global i2c bus not created");
+    ESP_LOGE(TAG, "I2C master not initialized");
     return ESP_FAIL;
   }
-  
-  bme280_ = bme280_create(i2c_bus, I2C_ADDR_BME280);
+
+  bme280_ = bme280_create(i2c_master_bus, I2C_ADDR_BME280);
   if (!bme280_)
   {
     ESP_LOGE(TAG, "Failed to create bme280 handle");
