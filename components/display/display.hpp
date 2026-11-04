@@ -57,7 +57,6 @@ class Display
     esp_err_t touch_init();
     esp_err_t touch_reset();
     esp_err_t backlight_init();
-    esp_err_t ch422g_write_output(uint8_t value);
 
     bool ready_ = false;
 };

@@ -43,37 +43,6 @@ namespace
 
 } // Namespace
 
-// esp_lcd_touch_gt911 example
-/*
-{
-    esp_lcd_panel_io_i2c_config_t io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
-
-    esp_lcd_touch_io_gt911_config_t tp_gt911_config = {
-        .dev_addr = io_config.dev_addr,
-    };
-
-    esp_lcd_touch_config_t tp_cfg = {
-        .x_max = CONFIG_LCD_HRES,
-        .y_max = CONFIG_LCD_VRES,
-        .rst_gpio_num = -1,
-        .int_gpio_num = -1,
-        .levels = {
-            .reset = 0,
-            .interrupt = 0,
-        },
-        .flags = {
-            .swap_xy = 0,
-            .mirror_x = 0,
-            .mirror_y = 0,
-        },
-        .driver_data = &tp_gt911_config,
-    };
-
-    esp_lcd_touch_handle_t tp;
-    esp_lcd_touch_new_i2c_gt911(io_handle, &tp_cfg, &tp);
-}
-*/
-
 esp_err_t Display::backlight_init()
 {
   if (!board_i2c_master_is_ready()) 
@@ -111,15 +80,14 @@ esp_err_t Display::backlight_init()
     return ret;
   }
 
-  /* CHANGED: CH422G mode write is ONE byte, value 0x01.
-   * This enables push-pull output mode for EXIO0..7. */
-  const uint8_t mode = 0x01;
+  // Set output mode
+  const uint8_t mode_set[] = { 0x02, 0xFF };
   ret = i2c_master_transmit(
     bl_cfg_dev_,
-    &mode,
-    sizeof(mode),
+    mode_set,
+    sizeof(mode_set),
     I2C_MASTER_TIMEOUT_MS);
-  
+
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "Failed to set CH422G output mode: %s", esp_err_to_name(ret));
@@ -140,60 +108,26 @@ esp_err_t Display::backlight_init()
   return ESP_OK;
 }
 
-esp_err_t Display::ch422g_write_output(uint8_t value)
+esp_err_t Display::backlight_set(uint8_t value)
 {
-  if (bl_out_dev_ == nullptr) 
+  if (bl_cfg_dev_ == nullptr) 
     return ESP_ERR_INVALID_STATE;
   
 
+  // Vendor/register-addressed CH422G form:
+  // device address 0x24, then command byte + data byte.
+  const uint8_t output_cmd[] = { 0x03, value };
+
   esp_err_t err = i2c_master_transmit(
-    bl_out_dev_,
-    &value,
-    sizeof(value),
+    bl_cfg_dev_,
+    output_cmd,
+    sizeof(output_cmd),
     I2C_MASTER_TIMEOUT_MS);
 
-  if (err == CH422G_OUTPUT_NACK) 
-  {
-    /* Expected for some CH422G devices: 0x38 output writes may NACK. */
-    ESP_LOGD(TAG, "CH422G output write NACKed (expected): 0x%02X", value);
-    return ESP_OK;
-  }
+  if (err != ESP_OK) 
+    ESP_LOGE(TAG, "CH422G output write failed: %s", esp_err_to_name(err));
 
   return err;
-}
-
-esp_err_t Display::backlight_set(uint8_t value)
-{
-  // if (!bl_out_dev_) 
-  //   return ESP_ERR_INVALID_STATE;
-  //
-  // /* Register-based expander: command byte 0x03 selects the output
-  //  * register, followed by the EXIO bitmask. */
-  // const uint8_t output_cmd[] = { 0x03, value };
-  //
-  // esp_err_t err = i2c_master_transmit(
-  //   bl_cfg_dev_,
-  //   output_cmd,
-  //   sizeof(output_cmd),
-  //   I2C_MASTER_TIMEOUT_MS);
-  // 
-  // if (err != ESP_OK)
-  // {
-  //   ESP_LOGE(TAG,
-  //     "CH422G IO write: addr=0x%02X, freq=%lu, byte=0x%02X, err=%s (0x%x)",
-  //     (unsigned)I2C_ADDR_CH422G,
-  //     (unsigned long)I2C_MASTER_FREQ_HZ,
-  //     value,
-  //     esp_err_to_name(err),
-  //     (unsigned)err);
-  //   return err;
-  // }
-  //
-  // return ESP_OK; 
-
-  /* CHANGED: use the CH422G-specific output writer; a NACK from the
-  * 0x38 output command is not fatal. */
-  return ch422g_write_output(value);
 }
 
 esp_err_t Display::touch_init()
@@ -218,7 +152,7 @@ esp_err_t Display::touch_init()
     return ret;
   }
   
-  /* CHANGED: the CH422G must be initialized and the GT911 reset sequence
+  /* The backlight must be initialized and the GT911 reset sequence
    * must run before the GT911 driver is created. */
   ret = backlight_init();
   if (ret != ESP_OK) 
@@ -261,8 +195,8 @@ esp_err_t Display::touch_init()
   const esp_lcd_touch_config_t tp_cfg = {
     .x_max = LCD_H_RES,
     .y_max = LCD_V_RES,
-    .rst_gpio_num = (gpio_num_t)LCD_TOUCH_PIN_NUM_RST,
-    .int_gpio_num = (gpio_num_t)LCD_TOUCH_PIN_NUM_INT,
+    .rst_gpio_num = (gpio_num_t)-1,
+    .int_gpio_num = (gpio_num_t)-1,
     .levels = {
       .reset = 0,
       .interrupt = 0,
@@ -272,7 +206,7 @@ esp_err_t Display::touch_init()
       .mirror_x = 0,
       .mirror_y = 0,
     },
-    .driver_data = &tp_gt911_config,
+    // .driver_data = &tp_gt911_config,
   };
 
   ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle_, &tp_cfg, &tp_handle_);
@@ -290,8 +224,7 @@ esp_err_t Display::touch_reset()
   if (bl_out_dev_ == nullptr) 
     return ESP_ERR_INVALID_STATE;
 
-  /* CHANGED: use the NACK-tolerant CH422G output writer. */
-  esp_err_t ret = ch422g_write_output(0x2C);
+  esp_err_t ret = backlight_set(0x2C);
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "CH422G touch-reset stage 1 failed: %s", esp_err_to_name(ret));
@@ -304,7 +237,7 @@ esp_err_t Display::touch_reset()
 
   esp_rom_delay_us(100 * 1000);
 
-  ret = ch422g_write_output(0x2E);
+  ret = backlight_set(0x2E);
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "CH422G touch-reset stage 2 failed: %s", esp_err_to_name(ret));
