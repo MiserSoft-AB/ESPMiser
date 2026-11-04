@@ -9,12 +9,13 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
 #include <esp_lcd_panel_io.h>
-// #include <lvgl.h>
+#include <lvgl.h>
+
+#define BACKLIGHT_MASK ((uint8_t)(1U << 2))
 
 class Display
 {
   public:
-
     Display() {}; 
     ~Display() {};
 
@@ -57,11 +58,10 @@ class Display
     esp_err_t touch_init();
     esp_err_t touch_reset();
     esp_err_t backlight_init();
+    // esp_err_t lvgl_init();
 
     bool ready_ = false;
 };
-
-void display_task(void* parameter); //explain
 
 
 #endif // __DISPLAY_HPP__

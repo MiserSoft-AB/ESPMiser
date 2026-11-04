@@ -1,4 +1,4 @@
-idf_component_register(SRCS "ui_task.cpp"
+idf_component_register(SRCS "ui.cpp"
   INCLUDE_DIRS "." 
-  PRIV_REQUIRES common
+  PRIV_REQUIRES common display
 )

@@ -10,8 +10,6 @@
 #include "freertos/timers.h"
 #include "portmacro.h"
 
-#define BACKLIGHT_MASK ((uint8_t)(1U << 2))
-
 namespace 
 {
     /* The CH422G output command at 0x38 may not ACK. The new I2C master
@@ -20,26 +18,6 @@ namespace
     constexpr esp_err_t CH422G_OUTPUT_NACK = ESP_ERR_INVALID_STATE;
 
     constexpr char TAG[] = "display";
-    constexpr uint32_t DISPLAY_REFRESH_MS = 2000;
-
-    struct DisplayBuffer
-    {
-        uint32_t refresh_count;
-    };
-
-    DisplayBuffer display_buffer{};
-
-    TaskHandle_t display_task_handle = nullptr;
-
-    void display_timer_callback(TimerHandle_t timer)
-    {
-        (void)timer;
-
-        if (display_task_handle != nullptr)
-        {
-            xTaskNotifyGive(display_task_handle);
-        }
-    }
 
 } // Namespace
 
@@ -48,11 +26,9 @@ esp_err_t Display::backlight_init()
   if (!board_i2c_master_is_ready()) 
     return ESP_ERR_INVALID_STATE;
   
-
   if (bl_cfg_dev_ != nullptr && bl_out_dev_ != nullptr) 
     return ESP_OK;
   
-
   /* CH422G uses its I2C address as the command selector:
    * - 0x24: mode command
    * - 0x38: EXIO0..7 output command
@@ -69,6 +45,7 @@ esp_err_t Display::backlight_init()
     .scl_speed_hz = I2C_MASTER_FREQ_HZ,
   };
 
+  ESP_LOGD(TAG, "Adding backlight cfg i2c device");
   esp_err_t ret = i2c_master_bus_add_device(
     board_i2c_master_bus_get(),
     &mode_cfg,
@@ -80,6 +57,7 @@ esp_err_t Display::backlight_init()
     return ret;
   }
 
+  ESP_LOGD(TAG, "Setting backlight output mode");
   // Set output mode
   const uint8_t mode_set[] = { 0x02, 0xFF };
   ret = i2c_master_transmit(
@@ -94,6 +72,7 @@ esp_err_t Display::backlight_init()
     return ret;
   }
 
+  ESP_LOGD(TAG, "Adding backlight output i2c device");
   ret = i2c_master_bus_add_device(
     board_i2c_master_bus_get(),
     &output_cfg,
@@ -152,12 +131,14 @@ esp_err_t Display::touch_init()
     return ret;
   }
   
+  ESP_LOGD(TAG, "Initializing backlight");
   /* The backlight must be initialized and the GT911 reset sequence
    * must run before the GT911 driver is created. */
   ret = backlight_init();
   if (ret != ESP_OK) 
     return ret;
 
+  ESP_LOGD(TAG, "Resetting touch");
   ret = touch_reset();
   if (ret != ESP_OK) 
     return ret;
@@ -223,27 +204,35 @@ esp_err_t Display::touch_reset()
 {
   if (bl_out_dev_ == nullptr) 
     return ESP_ERR_INVALID_STATE;
+  
+  esp_err_t ret;
 
-  esp_err_t ret = backlight_set(0x2C);
+  ESP_LOGD(TAG, "Reset setting backlight");
+  ret = backlight_set(0x0C);
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "CH422G touch-reset stage 1 failed: %s", esp_err_to_name(ret));
     return ret;
   }
 
+  ESP_LOGD(TAG, "Rom delay");
   esp_rom_delay_us(100 * 1000);
 
+  ESP_LOGD(TAG, "Setting gpio level");
   gpio_set_level(LCD_TOUCH_RESET_IO, 0);
 
+  ESP_LOGD(TAG, "Rom delay");
   esp_rom_delay_us(100 * 1000);
 
-  ret = backlight_set(0x2E);
+  ESP_LOGD(TAG, "Reset setting backlight");
+  ret = backlight_set(0x0E);
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "CH422G touch-reset stage 2 failed: %s", esp_err_to_name(ret));
     return ret;
   }
 
+  ESP_LOGD(TAG, "Rom delay");
   esp_rom_delay_us(200 * 1000);
 
   return ESP_OK;
@@ -329,12 +318,15 @@ esp_err_t Display::init()
     }
   }
 
+  ESP_LOGD(TAG, "Initializing RGB panel");
+
   // RGB panel first
   if (rgb_init() != ESP_OK) {
     ESP_LOGE(TAG, "RGB display panel failed to init");
     return ESP_FAIL;
   }
 
+  ESP_LOGD(TAG, "Initializing Touch");
   /* touch_init() performs CH422G initialization and the
    * complete GT911 reset sequence itself, so do not call backlight_init()
    * separately here. */
@@ -346,6 +338,7 @@ esp_err_t Display::init()
 
   vTaskDelay(pdMS_TO_TICKS(100));
 
+  ESP_LOGD(TAG, "Setting initial backlight");
   // Set backlight
   if (backlight_set(0x1E) != ESP_OK) 
   {
@@ -357,67 +350,3 @@ esp_err_t Display::init()
   return ESP_OK;
 }
 
-
-void display_task(void* parameter)
-{
-    Display* Disp = (Display*)parameter;
-    if (!Disp || !Disp->is_ready())
-    {
-        ESP_LOGE(TAG, "Display is not inited or not passed as task parameter");
-        return;
-    }
-
-    display_task_handle = xTaskGetCurrentTaskHandle();
-
-    static StaticTimer_t timer_storage;
-
-    TimerHandle_t refresh_timer = xTimerCreateStatic
-    (
-        "display_refresh",
-        pdMS_TO_TICKS(DISPLAY_REFRESH_MS),
-        pdTRUE,
-        nullptr,
-        display_timer_callback,
-        &timer_storage
-    );
-
-    if (refresh_timer == nullptr)
-    {
-        ESP_LOGE(TAG, "Failed to create display timer");
-        display_task_handle = nullptr;
-        vTaskDelete(nullptr);
-        return;
-    }
-
-    if (xTimerStart(refresh_timer, pdMS_TO_TICKS(100)) != pdPASS)
-    {
-        ESP_LOGE(TAG, "Failed to start display timer");
-        display_task_handle = nullptr;
-        vTaskDelete(nullptr);
-        return;
-    }
-
-    ESP_LOGI(TAG, "Display timer start requested");
-
-    while (true)
-    {
-        if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(3000)) == 0) 
-        {
-            ESP_LOGW(TAG, "No display timer notification within 3 seconds");
-            continue;
-        }
-
-        // Just switch backlight on/off for test
-        // TODO: Replace with UI update, or move all this to UI and let that handle it
-        // Or have a queue recieve from UI to update
-        if (display_buffer.refresh_count % 2 == 0) 
-            Disp->backlight_set(0x00);
-        else 
-            Disp->backlight_set(BACKLIGHT_MASK);
-        
-
-        display_buffer.refresh_count++;
-
-        ESP_LOGI(TAG, "Display buffer update frame %lu", static_cast<unsigned long>(display_buffer.refresh_count));
-    }
-}
