@@ -18,21 +18,26 @@ void Ui::ui_task(void* param) {
       switch (UiD.type) 
       {
         case UI_NO_DATA:
-          ESP_LOGI(TAG, "Data recieved but no type specified");
+          ESP_LOGW(TAG, "Data recieved but no type specified");
           break;
         case UI_LEOP_DATA:
-          ESP_LOGI(TAG, "Leop Data recieved: %f", UiD.leop_data.price);
+          ESP_LOGI(TAG, "Leop Data recieved: time: %lld, price: %d, cheapness: %d, solar_dev: %d", 
+            UiD.leop_data.energy_plan.timestamp, 
+            UiD.leop_data.energy_plan.price[0],
+            UiD.leop_data.energy_plan.cheapness_quarter[0],
+            UiD.leop_data.energy_plan.solar_quarter[0]
+          );
           break;
         case UI_SENSOR_DATA:
-          ESP_LOGI(TAG, "Sensors Data recieved: temp: %f, humidity: %f, press: %f.", 
+          ESP_LOGD(TAG, "Sensors Data recieved: temp: %f, humidity: %f, press: %f.", 
             UiD.sensor_data.temperature,
             UiD.sensor_data.pressure,
             UiD.sensor_data.humidity
           );
           break;
         case UI_ALL_DATA:
-          ESP_LOGI(TAG, "All data recieved! price: %ftemp: %f, humidity: %f, press: %f.", 
-            UiD.leop_data.price,
+          ESP_LOGD(TAG, "All data recieved! price: %ftemp: %f, humidity: %f, press: %f.", 
+            UiD.leop_data.energy_plan.price[0],
             UiD.sensor_data.temperature,
             UiD.sensor_data.pressure,
             UiD.sensor_data.humidity

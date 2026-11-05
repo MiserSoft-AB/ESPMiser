@@ -69,7 +69,7 @@ void Sensors::sensors_task(void* self)
         .humidity     = (float)rand() / RAND_MAX,
         .pressure     = (float)rand() / RAND_MAX,
       };
-      ESP_LOGI(TAG, "Sending temp: %f, humidity: %f, press: %f to queue.", 
+      ESP_LOGD(TAG, "Sending temp: %f, humidity: %f, press: %f to queue.", 
         UiD.sensor_data.temperature,
         UiD.sensor_data.pressure,
         UiD.sensor_data.humidity

@@ -119,13 +119,13 @@ void MiserSysMon::run()
     {
       ESP_LOGW(TAG, "Low heap: %zu bytes", free_heap);
     }
-    ESP_LOGI(TAG, "Heap available (bytes): %d", esp_get_free_heap_size());
+    ESP_LOGD(TAG, "Heap available (bytes): %d", esp_get_free_heap_size());
 
     // 3. Inspect Task Stacks 
     // NOTE: is expensive, potentially remove if overhead is needed
     static TaskStatus_t tasks[MAX_TASKS];
     UBaseType_t task_count = uxTaskGetNumberOfTasks();
-    ESP_LOGI(TAG, "Tasks managed by FreeRTOS: %d", (unsigned)task_count);
+    ESP_LOGD(TAG, "Tasks managed by FreeRTOS: %d", (unsigned)task_count);
 
     if (task_count > MAX_TASKS) 
     {
@@ -137,7 +137,7 @@ void MiserSysMon::run()
     UBaseType_t reported_count =
       uxTaskGetSystemState(tasks, task_count, NULL);
 
-    ESP_LOGI(TAG, "Tasks registered: %u", (unsigned)reported_count);
+    ESP_LOGD(TAG, "Tasks registered: %u", (unsigned)reported_count);
 
     // Checks for individual tasks health
     for (UBaseType_t i = 0; i < reported_count; i++) {
@@ -152,12 +152,12 @@ void MiserSysMon::run()
       }
 
       // Debug log task names
-      ESP_LOGI(TAG, "Task %i: %s", i, tasks[i].pcTaskName);
+      ESP_LOGD(TAG, "Task %i: %s", i, tasks[i].pcTaskName);
     }
     // 4. WiFi Status ?
 
     // 5. Get silicon temperature
-    ESP_LOGI(TAG, "Chip temp: %.1fC", get_temp());
+    ESP_LOGD(TAG, "Chip temp: %.1fC", get_temp());
 
     vTaskDelay(pdMS_TO_TICKS(1000)); // Run every second
   }

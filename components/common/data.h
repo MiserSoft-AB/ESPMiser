@@ -31,16 +31,17 @@ typedef struct
 } Weather_Sample; // Weather state at specified timestamp
 
 typedef struct {
-  // POSSIBLE INT VALUES:
+  // POSSIBLE CHEAPNESS VALUES:
   //   1 = BUY
   //   0 = STORE
   //  -1 = SELL
+  
   time_t timestamp;
 
   int price[4];
   int cheapness_quarter[4];
-  int solar_dev_quarter[4];
-  int consumption_quarter[4];
+  int solar_quarter[4];
+  // int consumption_quarter[4]; // Does not exist in the api response without a separate endpoint call and connected P1 meter?
 
 } Hourly_Energy_Plan; // Energy plan is recieved in increments of 15 min from the LEOP server. Value of 4 = store 1hr forecast.
 
@@ -70,17 +71,10 @@ typedef struct
 
 static void ui_data_init(Ui_Data* UiD)
 {
-  *UiD = {
-    .leop_data = {
-      .price = 0,
-    },
-    .sensor_data = {
-      .temperature = 0.0,
-      .humidity    = 0.0,
-      .pressure    = 0.0,
-    },
-    .type = UI_NO_DATA,
-  };
+  if (UiD == nullptr) {return;}
+
+  *UiD = Ui_Data{};
+  UiD->type = UI_NO_DATA;
 }
 
 #ifdef __cplusplus
