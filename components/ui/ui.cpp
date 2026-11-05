@@ -34,61 +34,64 @@ namespace
 
 esp_err_t Ui::init_page_main()
 {
-  // (void)Disp;
-
-  // if (esp_lv_adapter_lock(-1) != ESP_OK) {
-  //   ESP_LOGE(TAG, "Failed to take LVGL lock");
-  //   return ESP_FAIL;
-  // }
-
-  if (!lv_scr_act())
-  {
+  if (!lv_scr_act()) {
     ESP_LOGE(TAG, "No active screen, display not ready");
     return ESP_ERR_INVALID_STATE;
   }
 
-  if (esp_lv_adapter_lock(-1) == ESP_OK) {
-
-    // Full-screen black background
-    lv_obj_t* scr = lv_scr_act();
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0xF54927), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    // Test: solid blue circle, no text — tests if ANY child widget renders
-    lv_obj_t* circle = lv_obj_create(scr);
-    lv_obj_set_size(circle, 100, 100);
-    lv_obj_set_style_radius(circle, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(circle, lv_color_hex(0x0000FF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(circle, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(circle, LV_ALIGN_CENTER, -150, 0);
-
-    // Test: solid green square, no text
-    lv_obj_t* square = lv_obj_create(scr);
-    lv_obj_set_size(square, 80, 80);
-    lv_obj_set_style_radius(square, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(square, lv_color_hex(0x00FF00), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(square, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(square, LV_ALIGN_CENTER, 150, 0);
-
-    // Minimal test: one label with the built-in default font
-    lv_obj_t* title = lv_label_create(scr);
-    lv_label_set_text(title, "LVGL works!");
-    lv_obj_align(title, LV_ALIGN_CENTER, 0, -20);
-
-    ESP_LOGI(TAG, "Label created: %p, text='%s'", (void*)title, lv_label_get_text(title));
-
-    // Second test: explicit Montserrat 14 font
-    lv_obj_t* title2 = lv_label_create(scr);
-    lv_label_set_text(title2, "Montserrat 14");
-    lv_obj_align(title2, LV_ALIGN_CENTER, 0, 30);
-    lv_obj_set_style_text_font(title2, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    // Force an immediate redraw of the whole screen so we don't have to wait for a refresh cycle
-    lv_obj_invalidate(scr);
-
-    esp_lv_adapter_refresh_now(display_.lv_disp_get());
-    esp_lv_adapter_unlock();
+  if (esp_lv_adapter_lock(-1) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to take LVGL lock");
+    return ESP_FAIL;
   }
+
+  lv_obj_t* scr = lv_scr_act();
+
+  lv_obj_set_style_bg_color(scr, lv_color_hex(0x101418), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+  // Title
+  lv_obj_t* title = lv_label_create(scr);
+  lv_label_set_text(title, "Live Data");
+  lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(title, &notosans_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 20);
+
+  // Price
+  label_price_ = lv_label_create(scr);
+  lv_label_set_text(label_price_, "Price: -- kr");
+  lv_obj_set_style_text_color(label_price_, lv_color_hex(0xFFD166), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(label_price_, &notosans_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_align(label_price_, LV_ALIGN_CENTER, 0, -60);
+
+  // Temperature
+  label_temp_ = lv_label_create(scr);
+  lv_label_set_text(label_temp_, "Temp: -- C");
+  lv_obj_set_style_text_color(label_temp_, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(label_temp_, &notosans_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_align(label_temp_, LV_ALIGN_CENTER, 0, -10);
+
+  // Humidity
+  label_humidity_ = lv_label_create(scr);
+  lv_label_set_text(label_humidity_, "Humidity: -- %");
+  lv_obj_set_style_text_color(label_humidity_, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(label_humidity_, &notosans_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_align(label_humidity_, LV_ALIGN_CENTER, 0, 25);
+
+  // Pressure
+  label_pressure_ = lv_label_create(scr);
+  lv_label_set_text(label_pressure_, "Pressure: -- hPa");
+  lv_obj_set_style_text_color(label_pressure_, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(label_pressure_, &notosans_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_align(label_pressure_, LV_ALIGN_CENTER, 0, 60);
+
+  // Show initial queue values immediately, if available
+  if (DataQueue::get(&Qd_, 0) == 0) {
+    update(Qd_);
+  }
+
+  lv_obj_invalidate(scr);
+  esp_lv_adapter_refresh_now(display_.lv_disp_get());
+  esp_lv_adapter_unlock();
 
   ESP_LOGI(TAG, "Main page initialized");
   return ESP_OK;
@@ -96,34 +99,30 @@ esp_err_t Ui::init_page_main()
 
 void Ui::update(const DataQueue::Data& Qd)
 {
-  char buf[32];
+  char buf[48];
 
   if (esp_lv_adapter_lock(-1) != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to take LVGL lock");
-      return;
+    ESP_LOGE(TAG, "Failed to take LVGL lock");
+    return;
   }
 
-  if (label_price_)
-  {
-    lv_snprintf(buf, sizeof(buf), "%.2f kr", Qd.leop.price);
+  if (label_price_) {
+    lv_snprintf(buf, sizeof(buf), "Price: %.2f kr", Qd.leop.price);
     lv_label_set_text(label_price_, buf);
   }
 
-  if (label_temp_)
-  {
-    lv_snprintf(buf, sizeof(buf), "%.1f", Qd.sensor.temperature);
+  if (label_temp_) {
+    lv_snprintf(buf, sizeof(buf), "Temp: %.1f C", Qd.sensor.temperature);
     lv_label_set_text(label_temp_, buf);
   }
 
-  if (label_humidity_)
-  {
-    lv_snprintf(buf, sizeof(buf), "%.1f", Qd.sensor.humidity);
+  if (label_humidity_) {
+    lv_snprintf(buf, sizeof(buf), "Humidity: %.1f %%", Qd.sensor.humidity);
     lv_label_set_text(label_humidity_, buf);
   }
 
-  if (label_pressure_)
-  {
-    lv_snprintf(buf, sizeof(buf), "%.1f", Qd.sensor.pressure);
+  if (label_pressure_) {
+    lv_snprintf(buf, sizeof(buf), "Pressure: %.1f hPa", Qd.sensor.pressure);
     lv_label_set_text(label_pressure_, buf);
   }
 
