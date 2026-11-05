@@ -103,6 +103,12 @@ bool board_i2c_master_is_ready();
 #define LCD_TOUCH_PIN_NUM_RST -1
 #define LCD_TOUCH_PIN_NUM_INT -1
 
+#define LCD_HSYNC_PULSE_WIDTH 162
+#define LCD_HSYNC_BACK_PORCH 152
+#define LCD_HSYNC_FRONT_PORCH 48
+#define LCD_VSYNC_PULSE_WIDTH 45
+#define LCD_VSYNC_BACK_PORCH 13
+#define LCD_VSYNC_FRONT_PORCH 3
 
 #ifdef __cplusplus
 } // extern "C"

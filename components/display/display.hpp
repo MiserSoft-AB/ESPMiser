@@ -36,6 +36,10 @@ class Display
     // Is display inited?
     bool is_ready() { return ready_; }
 
+    lv_display_t* lv_disp_get() { return lv_disp_; }
+    lv_indev_t*   lv_touch_get() { return lv_touch_; }
+
+
   private:
     // Main rgb panel handle
     esp_lcd_panel_handle_t  rgb_handle_ = nullptr;

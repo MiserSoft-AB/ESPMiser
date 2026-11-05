@@ -2,9 +2,11 @@
 #define __UI_TASK_HPP__
 
 #include "display.hpp"
+#include "data_queue.hpp"
 
-#include <lvgl.h>
+#include <esp_lv_adapter.h>
 #include <esp_err.h>
+#include <lvgl.h>
 
 class Ui 
 {
@@ -24,13 +26,20 @@ public:
   // Must pass inited Ui class as param 
   static void ui_task(void* param);
 
-  esp_err_t init_page_main(Display& Disp);
+  // Build the main page widgets. Must run with display ready (LVGL initialized).
+  esp_err_t init_page_main();
+
+  // Push latest queue data into the widgets.
+  void update(const DataQueue::Data& Qd);
 
 private:
-  // Ui() {} // no instantiation, might reconsider
-          // we should learn to use templates though
+  Display         display_;
+  DataQueue::Data Qd_{};
 
-  Display   display_;
+  lv_obj_t* label_price_    = nullptr;
+  lv_obj_t* label_temp_     = nullptr;
+  lv_obj_t* label_humidity_ = nullptr;
+  lv_obj_t* label_pressure_ = nullptr;
 };
 
 #endif // __UI_TASK_HPP__

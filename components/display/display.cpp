@@ -40,6 +40,11 @@ esp_err_t Display::lvgl_init()
   /* Initialize adapter (initializes LVGL too) */
   esp_lv_adapter_config_t lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
   err = esp_lv_adapter_init(&lv_adapter_cfg);
+  if (err != ESP_OK)
+  {
+    ESP_LOGE(TAG, "esp_lv_adapter_init failed: %s", esp_err_to_name(err));
+    return err;
+  }
 
   /* Register display */
   esp_lv_adapter_display_config_t lv_disp_cfg = {
@@ -54,7 +59,7 @@ esp_err_t Display::lvgl_init()
       .require_double_buffer = false,
       .mono_layout           = ESP_LV_ADAPTER_MONO_LAYOUT_NONE
     },
-    .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,
+    .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_DOUBLE_DIRECT,
   };
 
   lv_disp_ = esp_lv_adapter_register_display(&lv_disp_cfg);
@@ -293,7 +298,9 @@ esp_err_t Display::touch_reset()
 
 esp_err_t Display::rgb_init()
 {
-  const uint8_t num_fbs = 2; // Number of framebuffers to allocate
+  const uint8_t num_fbs = esp_lv_adapter_get_required_frame_buffer_count(
+    ESP_LV_ADAPTER_TEAR_AVOID_MODE_DOUBLE_DIRECT,
+    ESP_LV_ADAPTER_ROTATE_0);; // Number of framebuffers to allocate
 
   esp_lcd_rgb_panel_config_t panel_config = {
     .clk_src = LCD_CLK_SRC_DEFAULT,
@@ -301,12 +308,12 @@ esp_err_t Display::rgb_init()
       .pclk_hz = LCD_PIXEL_CLOCK_HZ,
       .h_res = LCD_H_RES,
       .v_res = LCD_V_RES,
-      .hsync_pulse_width = 4,
-      .hsync_back_porch  = 8,
-      .hsync_front_porch = 8,
-      .vsync_pulse_width = 4,
-      .vsync_back_porch  = 8,
-      .vsync_front_porch = 8,
+      .hsync_pulse_width     = LCD_HSYNC_PULSE_WIDTH,
+      .hsync_back_porch      = LCD_HSYNC_BACK_PORCH,
+      .hsync_front_porch     = LCD_HSYNC_FRONT_PORCH,
+      .vsync_pulse_width     = LCD_VSYNC_PULSE_WIDTH,
+      .vsync_back_porch      = LCD_VSYNC_BACK_PORCH,
+      .vsync_front_porch     = LCD_VSYNC_FRONT_PORCH,
       .flags = {
         .pclk_active_neg = 1,
       },
