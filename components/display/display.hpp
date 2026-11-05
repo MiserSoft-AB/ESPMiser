@@ -16,7 +16,7 @@ class Display
   public:
 
     Display() {}; 
-    ~Display() {};
+    ~Display() noexcept;
 
     // No copy, no move
     Display(const Display&) = delete;
@@ -35,6 +35,9 @@ class Display
     bool is_ready() { return ready_; }
 
   private:
+    void cleanup() noexcept;
+    bool owns_resources() const noexcept;
+    bool touch_reset_gpio_configured_ = false;
     esp_lcd_panel_handle_t  rgb_handle_ = nullptr;
 
     // CH422G LED driver

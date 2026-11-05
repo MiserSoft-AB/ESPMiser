@@ -152,6 +152,8 @@ esp_err_t Display::touch_init()
              (int)LCD_TOUCH_RESET_IO, esp_err_to_name(ret));
     return ret;
   }
+
+  touch_reset_gpio_configured_ = true;
   
   /* The backlight must be initialized and the GT911 reset sequence
    * must run before the GT911 driver is created. */
@@ -320,6 +322,22 @@ esp_err_t Display::rgb_init()
 
 esp_err_t Display::init()
 {
+  if (ready_)
+  {
+    return ESP_OK;
+  }
+
+  if (owns_resources())
+  {
+    cleanup();
+  
+    if (owns_resources())
+    {
+      ESP_LOGE(TAG, "previous display resources could not be released");
+      return ESP_ERR_INVALID_STATE;
+    }
+  }
+
   if (!board_i2c_master_is_ready()) 
   {
     ESP_LOGW(TAG, "Global i2c master not inited, trying to init");
@@ -333,6 +351,7 @@ esp_err_t Display::init()
   // RGB panel first
   if (rgb_init() != ESP_OK) {
     ESP_LOGE(TAG, "RGB display panel failed to init");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -342,6 +361,7 @@ esp_err_t Display::init()
   if (touch_init() != ESP_OK) 
   {
     ESP_LOGE(TAG, "Touch panel failed to init");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -351,6 +371,7 @@ esp_err_t Display::init()
   if (backlight_set(0x1E) != ESP_OK) 
   {
     ESP_LOGE(TAG, "Failed to set backlight");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -418,4 +439,68 @@ void display_task(void* parameter)
 
         ESP_LOGI(TAG, "Display buffer update frame %lu", static_cast<unsigned long>(display_buffer.refresh_count));
     }
+}
+
+Display::~Display() noexcept
+{
+    cleanup();
+}
+
+bool Display::owns_resources() const noexcept
+{
+    return rgb_handle_ != nullptr || tp_handle_ != nullptr || tp_io_handle_ != nullptr || bl_cfg_dev_ != nullptr || bl_out_dev_ != nullptr || touch_reset_gpio_configured_;
+}
+
+void Display::cleanup() noexcept
+{
+    ready_ = false;
+
+    if (bl_cfg_dev_ != nullptr)
+    {
+      backlight_set(0x00); 
+    }
+
+    const auto release = [](auto& handle, auto delete_resource, const char* name)
+    {
+      if (handle == nullptr) 
+      {
+        return;
+      }
+        
+      const esp_err_t result = delete_resource(handle);
+      if (result == ESP_OK)
+      {
+        handle = nullptr;
+      }
+      else
+      {
+        ESP_LOGW(TAG, "Failed to release %s: %s", name, esp_err_to_name(result));
+      }
+    };
+  
+    release(tp_handle_, esp_lcd_touch_del, "touch panel");
+
+    if (tp_handle_ == nullptr)
+    {
+      release(tp_io_handle_, esp_lcd_panel_io_del, "touch panel I/O");
+    }
+
+    release(rgb_handle_, esp_lcd_panel_del, "RGB panel");
+
+    if (touch_reset_gpio_configured_ && tp_handle_ == nullptr)
+    {
+      const esp_err_t result = gpio_reset_pin(LCD_TOUCH_RESET_IO);
+      if (result == ESP_OK)
+      {
+        touch_reset_gpio_configured_ = false;
+      }
+      else
+      {
+        ESP_LOGW(TAG, "Failed to reset touch reset GPIO: %s", esp_err_to_name(result));
+      }
+    }
+
+    release(bl_out_dev_, i2c_master_bus_rm_device, "backlight output");
+    release(bl_cfg_dev_, i2c_master_bus_rm_device, "backlight config");
+        
 }
