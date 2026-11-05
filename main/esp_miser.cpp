@@ -105,10 +105,6 @@ extern "C" void app_main(void)
     ESP_LOGE(TAG, "Failed to create ui task");
 
 
-  // Register LEOP gptimer
-  if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // Configurable from menuconfig
-    ESP_LOGE(TAG, "Failed to setup leop task gptimer");
-
 
   // Start leop fetcher task for spots/calcs
   task_result = xTaskCreate(
@@ -122,6 +118,10 @@ extern "C" void app_main(void)
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
 
+
+  // Register LEOP gptimer
+  if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // Configurable from menuconfig
+    ESP_LOGE(TAG, "Failed to setup leop task gptimer");
   
 
   // Setup Sensors timer

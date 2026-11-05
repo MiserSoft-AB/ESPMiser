@@ -175,6 +175,8 @@ void LeopFetcher::leop_fetch_task(void* param)
     return;
   }
 
+  This->task_handle_ = xTaskGetCurrentTaskHandle();
+
   // Define URL to LEOP server
   size_t url_len = snprintf(url, 256, "%s:%s/%s%s", 
     CONFIG_LEOP_SERVER_URL, 
