@@ -1,7 +1,7 @@
 #ifndef __UI_TASK_HPP__
 #define __UI_TASK_HPP__
 
-#include "display.hpp"
+#include "display_adapter.hpp"
 #include "data_queue.hpp"
 
 #include <esp_lv_adapter.h>
@@ -33,7 +33,7 @@ public:
   void update(const DataQueue::Data& Qd);
 
 private:
-  Display         display_;
+  DisplayAdapter display_;
   DataQueue::Data Qd_{};
 
   lv_obj_t* label_price_    = nullptr;

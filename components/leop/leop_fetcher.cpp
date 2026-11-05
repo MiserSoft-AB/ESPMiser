@@ -1,12 +1,14 @@
 #include "leop_fetcher.hpp"
 #include "data.h"
 #include "esp_err.h"
+#include "esp_task_wdt.h"
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
 #include "data_queue.hpp"
 
 #include "http_client.hpp"
 
+#include <cstdio>
 #include <time.h> // for rand might remove
 
 // --------------------- Privates -------------------------
@@ -174,6 +176,8 @@ void LeopFetcher::leop_fetch_task(void* param)
     return;
   }
 
+  This->task_handle_ = xTaskGetCurrentTaskHandle();
+
   // Define URL to LEOP server
   size_t url_len = snprintf(url, 256, "%s:%s/%s%s", 
     CONFIG_LEOP_SERVER_URL, 
@@ -206,6 +210,20 @@ void LeopFetcher::leop_fetch_task(void* param)
   DataQueue::Data Qd{};
   Qd.type = DATA_LEOP;
 
+  // Register this task with the Task Watchdog Timer (WDT)
+  res = esp_task_wdt_add(nullptr);
+
+  if (res != ESP_OK)
+  {
+    ESP_LOGE(TAG, "Failed to register network task with TWDT: %s", esp_err_to_name(res));
+
+    vTaskDelete(nullptr);
+    return;
+  }
+
+  // Reset the watchdog once per second while waiting
+  const TickType_t twdt_feed_interval = pdMS_TO_TICKS(1000); // 1 second
+
   while (1) 
   {
     ESP_LOGI(TAG, "Fetching LEOP data...");
@@ -221,22 +239,89 @@ void LeopFetcher::leop_fetch_task(void* param)
     {
       ESP_LOGI(TAG, "LEOP Response len:\n %zu", This->get_res_buf_len());
       ESP_LOGI(TAG, "LEOP Response:\n %s", This->get_res_buf());
+    
+      const char* start_pos = strstr(This->get_res_buf(), "\"start\":");
+      if (start_pos != nullptr) {
+        sscanf(start_pos, "\"start\":%lld", &Qd.leop.energy_plan.timestamp);
+      }
+
+      const char* prices_pos = strstr(This->get_res_buf(), "\"prices\":");
+      if (prices_pos != nullptr) {
+        sscanf(prices_pos, "\"prices\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.price[0], 
+          &Qd.leop.energy_plan.price[1], 
+          &Qd.leop.energy_plan.price[2], 
+          &Qd.leop.energy_plan.price[3]
+        );
+      }
+
+      const char* cheapness_pos = strstr(This->get_res_buf(), "\"cheapness\":");
+      if (cheapness_pos != nullptr) {
+        sscanf(cheapness_pos, "\"cheapness\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.cheapness_quarter[0], 
+          &Qd.leop.energy_plan.cheapness_quarter[1], 
+          &Qd.leop.energy_plan.cheapness_quarter[2], 
+          &Qd.leop.energy_plan.cheapness_quarter[3]
+        );
+      }
+
+      const char* solar_pos = strstr(This->get_res_buf(), "\"solar\":");
+      if (solar_pos != nullptr) {
+        sscanf(solar_pos, "\"solar\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.solar_quarter[0], 
+          &Qd.leop.energy_plan.solar_quarter[1], 
+          &Qd.leop.energy_plan.solar_quarter[2], 
+          &Qd.leop.energy_plan.solar_quarter[3]
+        );
+      }
+
+      // --- Send new parsed data to UI Queue
+
+      ESP_LOGI(TAG, "Sending LEOP to queue.");
+
+      DataQueue::send(Qd);
     }
 
-    // --- Send new parsed data to UI Queue
-    // Mock sending data over queue to ui
-    srand(time(NULL));
-    Qd.leop.price = (float)rand() / RAND_MAX;
-    ESP_LOGI(TAG, "Sending %f to queue.", Qd.leop.price);
+    // The network task completed another iteration
+    res = esp_task_wdt_reset();
 
-    // Send to consumer queues
-    DataQueue::send(Qd);
-    // UartQueue::send(UiD);
+    if (res != ESP_OK)
+    {
+      ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+    }
 
-    if (This->gptimer_enabled_) // Wait for GPTIMER signal
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-    else // Fallback to regular delay if timer failed to start is is still starting up
-      vTaskDelay(pdMS_TO_TICKS(This->timer_interval_ms_)); 
+    if (This->gptimer_enabled_)
+    {
+      // Wait for the timer notification in one second sections
+      while (ulTaskNotifyTake(pdTRUE, twdt_feed_interval) == 0)
+      {
+        res = esp_task_wdt_reset();
+
+        if (res != ESP_OK)
+        {
+          ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+        }
+      }
+    }
+    else
+    {
+      // Fallback: divide the full delay into one second sections
+      TickType_t remaining_ticks = pdMS_TO_TICKS(This->timer_interval_ms_);
+
+      while (remaining_ticks > 0)
+      {
+        const TickType_t wait_ticks = remaining_ticks > twdt_feed_interval ? twdt_feed_interval : remaining_ticks;
+
+        vTaskDelay(wait_ticks);
+        remaining_ticks -= wait_ticks;
+
+        res = esp_task_wdt_reset();
+
+        if (res != ESP_OK)
+        {
+          ESP_LOGE(TAG, "Failed to reset network TWDT: %s", esp_err_to_name(res));
+        }
+      }
+    }
   }
 }
-

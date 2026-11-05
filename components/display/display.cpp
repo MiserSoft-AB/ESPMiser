@@ -1,4 +1,6 @@
 #include "display.hpp"
+#include "display_hal.hpp"
+#include "display_update.hpp"
 #include "board_config.h"
 
 #include <cstdint>
@@ -46,6 +48,8 @@ esp_err_t Display::lvgl_init()
     return err;
   }
 
+  lv_adapter_initialized_ = true;
+
   /* Register display */
   esp_lv_adapter_display_config_t lv_disp_cfg = {
     .panel = rgb_handle_,
@@ -73,6 +77,11 @@ esp_err_t Display::lvgl_init()
   esp_lv_adapter_touch_config_t lv_touch_cfg =
     ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(lv_disp_, tp_handle_);
   lv_touch_ = esp_lv_adapter_register_touch(&lv_touch_cfg);
+  if (lv_touch_ == nullptr)
+  {
+    ESP_LOGE(TAG, "Failed to register LVGL touch");
+    return ESP_FAIL;
+  }
 
   /* Start LVGL task */
   err = esp_lv_adapter_start();
@@ -192,6 +201,8 @@ esp_err_t Display::touch_init()
     return ret;
   }
 
+  touch_reset_gpio_configured_ = true;
+  
   ESP_LOGD(TAG, "Initializing backlight");
   /* The backlight must be initialized and the GT911 reset sequence
    * must run before the GT911 driver is created. */
@@ -388,6 +399,22 @@ esp_err_t Display::rgb_init()
 
 esp_err_t Display::init()
 {
+  if (ready_)
+  {
+    return ESP_OK;
+  }
+
+  if (owns_resources())
+  {
+    cleanup();
+  
+    if (owns_resources())
+    {
+      ESP_LOGE(TAG, "previous display resources could not be released");
+      return ESP_ERR_INVALID_STATE;
+    }
+  }
+
   if (!board_i2c_master_is_ready()) 
   {
     ESP_LOGW(TAG, "Global i2c master not inited, trying to init");
@@ -403,6 +430,7 @@ esp_err_t Display::init()
   // RGB panel first
   if (rgb_init() != ESP_OK) {
     ESP_LOGE(TAG, "RGB display panel failed to init");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -413,6 +441,7 @@ esp_err_t Display::init()
   if (touch_init() != ESP_OK) 
   {
     ESP_LOGE(TAG, "Touch panel failed to init");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -423,12 +452,14 @@ esp_err_t Display::init()
   if (backlight_set(0x1E) != ESP_OK) 
   {
     ESP_LOGE(TAG, "Failed to set backlight");
+    cleanup();
     return ESP_FAIL;
   }
 
-  if (lvgl_init() != ESP_OK) 
+  if (lvgl_init() != ESP_OK)
   {
     ESP_LOGE(TAG, "Failed to init LVGL");
+    cleanup();
     return ESP_FAIL;
   }
 
@@ -436,3 +467,93 @@ esp_err_t Display::init()
   return ESP_OK;
 }
 
+Display::~Display() noexcept
+{
+  cleanup();
+}
+
+bool Display::owns_resources() const noexcept
+{
+  return rgb_handle_ != nullptr ||
+         tp_handle_ != nullptr ||
+         tp_io_handle_ != nullptr ||
+         bl_dev_ != nullptr ||
+         lv_disp_ != nullptr ||
+         lv_touch_ != nullptr ||
+         touch_reset_gpio_configured_ ||
+         lv_adapter_initialized_;
+}
+
+void Display::cleanup() noexcept
+{
+  ready_ = false;
+
+  if (lv_adapter_initialized_)
+  {
+    const esp_err_t result = esp_lv_adapter_deinit();
+    if (result != ESP_OK)
+    {
+      ESP_LOGW(TAG, "LVGL cleanup failed: %s", esp_err_to_name(result));
+    }
+
+    if (esp_lv_adapter_is_initialized())
+    {
+      ESP_LOGW(TAG, "LVGL still active, keeping hardware resources");
+      return;
+    }
+
+    lv_adapter_initialized_ = false;
+    lv_disp_ = nullptr;
+    lv_touch_ = nullptr;
+  }
+
+  if (bl_dev_ != nullptr)
+  {
+    backlight_set(0x00);
+  }
+
+  const auto release = [](auto& handle, auto delete_resource,
+                          const char* name)
+  {
+    if (handle == nullptr)
+    {
+      return;
+    }
+
+    const esp_err_t result = delete_resource(handle);
+    if (result == ESP_OK)
+    {
+      handle = nullptr;
+    }
+    else
+    {
+      ESP_LOGW(TAG, "Failed to release %s: %s",
+               name, esp_err_to_name(result));
+    }
+  };
+
+  release(tp_handle_, esp_lcd_touch_del, "touch controller");
+
+  if (tp_handle_ == nullptr)
+  {
+    release(tp_io_handle_, esp_lcd_panel_io_del, "touch I/O");
+  }
+
+  release(rgb_handle_, esp_lcd_panel_del, "RGB panel");
+
+  if (touch_reset_gpio_configured_ && tp_handle_ == nullptr)
+  {
+    const esp_err_t result = gpio_reset_pin(LCD_TOUCH_RESET_IO);
+    if (result == ESP_OK)
+    {
+      touch_reset_gpio_configured_ = false;
+    }
+    else
+    {
+      ESP_LOGW(TAG, "Failed to reset touch GPIO: %s",
+               esp_err_to_name(result));
+    }
+  }
+
+  release(bl_dev_, i2c_master_bus_rm_device, "backlight");
+}

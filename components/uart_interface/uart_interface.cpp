@@ -216,7 +216,7 @@ void UartInterface::cmd_palette(Command Cmd)
     case CMD_LEOP:   
     {
       uart_send("=== LEOP DATA ===\r\n");
-      uart_send("Price: %.2f\r\n", (double)data_.leop.price);
+      uart_send("Price: %.2f\r\n", (double)data_.leop.energy_plan.price[0]);
     } break;
     case CMD_SENSOR: 
     {

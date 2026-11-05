@@ -17,7 +17,7 @@ class Display
 {
   public:
     Display() {}; 
-    ~Display() {};
+    ~Display() noexcept;
 
     // No copy, no move
     Display(const Display&) = delete;
@@ -41,6 +41,10 @@ class Display
 
 
   private:
+    void cleanup() noexcept;
+    bool owns_resources() const noexcept;
+    bool touch_reset_gpio_configured_ = false;
+    bool lv_adapter_initialized_ = false;
     // Main rgb panel handle
     esp_lcd_panel_handle_t  rgb_handle_ = nullptr;
 

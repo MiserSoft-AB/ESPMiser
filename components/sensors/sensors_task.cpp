@@ -1,17 +1,13 @@
 #include "sensors_task.hpp"
+#include "sensors_update.hpp"
 #include "esp_err.h"
+#include "esp_task_wdt.h"
 #include "data_queue.hpp"
 
-// TODO: replace all bme280 specific shit with HAL equivalents
-#include "bme280.hpp"
-
 #include <esp_log.h>
-#include <time.h>
 
 static const char* TAG = "sensors";
 
-// TODO: replace all bme280 specific shit with HAL equivalents
-static Bme280 bme280;
 
 void Sensors::on_timer_signal(TimerHandle_t xTimer)
 {
@@ -50,55 +46,64 @@ esp_err_t Sensors::timer_setup(int timeout_ms)
 }
 
 // Static task
-void Sensors::sensors_task(void* self) 
+void Sensors::sensors_task(void* self)
 {
-  // Local copy of queue data
   DataQueue::Data Qd{};
   Qd.type = DATA_SENSOR;
 
-  Sensors* This = (Sensors*)self;
+  Sensors* This = static_cast<Sensors*>(self);
   if (!This)
-    vTaskDelete(NULL);
-
-  // TODO: replace all bme280 specific shit with HAL equivalents
-  if (bme280.init() != ESP_OK)
   {
-    ESP_LOGE(TAG, "Failed to init bme280");
-    vTaskDelete(NULL);
+    ESP_LOGE(TAG, "Invalid parameter passed to sensor task");
+    vTaskDelete(nullptr);
+    return;
   }
 
-  Bme280::Readings bme280_reads;
-
-  while (1) 
+  const esp_err_t init_result = This->sensor_.init();
+  if (init_result != ESP_OK)
   {
-    // Read sensors
-    bme280_reads = bme280.get_readings();
+    ESP_LOGE(TAG, "Failed to initialize sensor: %s", esp_err_to_name(init_result));
+    vTaskDelete(nullptr);
+    return;
+  }
 
-    // Send sensor reads
-    // Block until semaphore is given (timeout after 2 seconds)
-    if (xSemaphoreTake(This->timer_notify_, pdMS_TO_TICKS(2000)) == pdTRUE)
+  esp_err_t wdt_result = esp_task_wdt_add(nullptr);
+  if (wdt_result != ESP_OK)
+  {
+    ESP_LOGE(TAG, "Failed to register sensor task with WDT: %s", esp_err_to_name(wdt_result));
+    vTaskDelete(nullptr);
+    return;
+  }
+
+  while (true)
+  {
+    const SensorsUpdate update = read_sensor_update(This->sensor_);
+    const bool timer_signaled =
+      xSemaphoreTake(This->timer_notify_, pdMS_TO_TICKS(2000)) == pdTRUE;
+
+    if (update.should_publish(timer_signaled))
     {
-      // Mock sending sensor read data over queue to ui
-      srand(time(NULL));
-
       Qd.sensor = {
-        .temperature  = bme280_reads.temperature,
-        .humidity     = bme280_reads.humidity,
-        .pressure     = bme280_reads.pressure,
-        // .temperature  = (float)rand() / RAND_MAX,
-        // .humidity     = (float)rand() / RAND_MAX,
-        // .pressure     = (float)rand() / RAND_MAX,
+        .temperature = update.readings.temperature,
+        .humidity = update.readings.humidity,
+        .pressure = update.readings.pressure
       };
-
-      // ESP_LOGI(TAG, "Sending temp: %f, humidity: %f, press: %f to queue.", 
-      //   Qd.sensor.temperature,
-      //   Qd.sensor.pressure,
-      //   Qd.sensor.humidity
-      // );
-
       DataQueue::send(Qd);
     }
+    else if (!timer_signaled)
+    {
+      ESP_LOGE(TAG, "Semaphore timed out, ensure timer is started");
+    }
     else
-      ESP_LOGE(TAG, "Semaphore timed out, ensure timer is started!");
+    {
+      ESP_LOGW(TAG, "Failed to read sensor data: %s",
+               esp_err_to_name(update.read_result));
+    }
+
+    wdt_result = esp_task_wdt_reset();
+    if (wdt_result != ESP_OK)
+    {
+      ESP_LOGE(TAG, "Failed to reset sensor WDT: %s", esp_err_to_name(wdt_result));
+    }
   }
 }

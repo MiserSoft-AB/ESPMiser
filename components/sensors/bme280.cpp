@@ -16,22 +16,51 @@ Pin assignment:
         connect scl of sensor with GPIO2
 */
 
+Bme280::~Bme280() noexcept
+{
+  cleanup();
+}
+
+void Bme280::cleanup() noexcept
+{
+  if (bme280_ != nullptr)
+  {
+    const esp_err_t result = bme280_delete(&bme280_);
+    if (result != ESP_OK)
+    {
+      ESP_LOGW(TAG, "BME280 cleanup failed: %s", esp_err_to_name(result));
+    }
+  }
+}
+
 esp_err_t Bme280::init()
 {
-  i2c_master_bus_handle_t i2c_master_bus = board_i2c_master_bus_get();
-  if (!board_i2c_master_is_ready() || !i2c_master_bus)
+  if (bme280_ != nullptr)
+  {
+    return ESP_OK;
+  }
+
+  i2c_master_bus_handle_t i2c_master = board_i2c_master_bus_get();
+  if (!board_i2c_master_is_ready() || !i2c_master)
   {
     ESP_LOGE(TAG, "I2C master not initialized");
     return ESP_FAIL;
   }
 
-  bme280_ = bme280_create(i2c_master_bus, I2C_ADDR_BME280);
+  bme280_ = bme280_create(i2c_master, I2C_ADDR_BME280);
   if (!bme280_)
   {
-    ESP_LOGE(TAG, "Failed to create bme280 handle");
+    ESP_LOGE(TAG, "Failed to create BME280 handle");
     return ESP_FAIL;
   }
-  return bme280_default_init(bme280_);
+
+  const esp_err_t result = bme280_default_init(bme280_);
+  if (result != ESP_OK)
+  {
+    cleanup(); 
+  }
+
+  return result;
 }
 
 Bme280::Readings Bme280::get_readings()

@@ -16,7 +16,7 @@ public:
   };
 
   Bme280() {}; 
-  ~Bme280() {};
+  ~Bme280() noexcept;
 
   // No copy, no move
   Bme280(const Bme280&) = delete;
@@ -31,6 +31,8 @@ public:
   Readings get_readings();
 
 private:
+
+void cleanup() noexcept;
 
   bme280_handle_t  bme280_  = NULL;
   Readings readings_ = { 0.0, 0.0, 0.0 };

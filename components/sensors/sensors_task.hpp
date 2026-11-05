@@ -4,10 +4,12 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 
+#include "sensors_hal.hpp"
+
 class Sensors 
 {
 public:
-  Sensors() {};
+  explicit Sensors(ISensor& sensor) : sensor_(sensor) {};
   ~Sensors() {};
 
   // No copy, no move
@@ -25,6 +27,7 @@ public:
   static void sensors_task(void* self);
 
 private:
+  ISensor& sensor_;
 
   // Timer members
   TimerHandle_t     timer_handle_ = nullptr;
