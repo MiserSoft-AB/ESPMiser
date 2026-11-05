@@ -3,7 +3,7 @@
 #include "esp_err.h"
 #include "freertos/idf_additions.h"
 #include "sdkconfig.h"
-#include "ui_queue.hpp"
+#include "data_queue.hpp"
 
 #include "http_client.hpp"
 
@@ -203,9 +203,9 @@ void LeopFetcher::leop_fetch_task(void* param)
     return;
   }
 
-  // Local copy of ui data
-  Ui_Data UiD;
-  ui_data_init(&UiD);
+  // Local copy of queue data
+  DataQueue::Data Qd{};
+  Qd.type = DATA_LEOP;
 
   while (1) 
   {
@@ -223,54 +223,52 @@ void LeopFetcher::leop_fetch_task(void* param)
       ESP_LOGI(TAG, "LEOP Response len:\n %zu", This->get_res_buf_len());
       ESP_LOGI(TAG, "LEOP Response:\n %s", This->get_res_buf());
     
-    const char* start_pos = strstr(This->get_res_buf(), "\"start\":");
-    if (start_pos != nullptr) {
-      sscanf(start_pos, "\"start\":%lld", &UiD.leop_data.energy_plan.timestamp);
+      const char* start_pos = strstr(This->get_res_buf(), "\"start\":");
+      if (start_pos != nullptr) {
+        sscanf(start_pos, "\"start\":%lld", &Qd.leop.energy_plan.timestamp);
+      }
+
+      const char* prices_pos = strstr(This->get_res_buf(), "\"prices\":");
+      if (prices_pos != nullptr) {
+        sscanf(prices_pos, "\"prices\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.price[0], 
+          &Qd.leop.energy_plan.price[1], 
+          &Qd.leop.energy_plan.price[2], 
+          &Qd.leop.energy_plan.price[3]
+        );
+      }
+
+      const char* cheapness_pos = strstr(This->get_res_buf(), "\"cheapness\":");
+      if (cheapness_pos != nullptr) {
+        sscanf(cheapness_pos, "\"cheapness\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.cheapness_quarter[0], 
+          &Qd.leop.energy_plan.cheapness_quarter[1], 
+          &Qd.leop.energy_plan.cheapness_quarter[2], 
+          &Qd.leop.energy_plan.cheapness_quarter[3]
+        );
+      }
+
+      const char* solar_pos = strstr(This->get_res_buf(), "\"solar\":");
+      if (solar_pos != nullptr) {
+        sscanf(solar_pos, "\"solar\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.solar_quarter[0], 
+          &Qd.leop.energy_plan.solar_quarter[1], 
+          &Qd.leop.energy_plan.solar_quarter[2], 
+          &Qd.leop.energy_plan.solar_quarter[3]
+        );
+      }
+
+      // --- Send new parsed data to UI Queue
+
+      ESP_LOGI(TAG, "Sending LEOP to queue.");
+
+      DataQueue::send(Qd);
     }
+
+      if (This->gptimer_enabled_) // Wait for GPTIMER signal
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
+      else // Fallback to regular delay if timer failed to start is is still starting up
+        vTaskDelay(pdMS_TO_TICKS(This->timer_interval_ms_)); 
     
-    const char* prices_pos = strstr(This->get_res_buf(), "\"prices\":");
-    if (prices_pos != nullptr) {
-      sscanf(prices_pos, "\"prices\":[%d,%d,%d,%d", 
-        &UiD.leop_data.energy_plan.price[0], 
-        &UiD.leop_data.energy_plan.price[1], 
-        &UiD.leop_data.energy_plan.price[2], 
-        &UiD.leop_data.energy_plan.price[3]
-      );
-    }
-
-    const char* cheapness_pos = strstr(This->get_res_buf(), "\"cheapness\":");
-    if (cheapness_pos != nullptr) {
-      sscanf(cheapness_pos, "\"cheapness\":[%d,%d,%d,%d", 
-        &UiD.leop_data.energy_plan.cheapness_quarter[0], 
-        &UiD.leop_data.energy_plan.cheapness_quarter[1], 
-        &UiD.leop_data.energy_plan.cheapness_quarter[2], 
-        &UiD.leop_data.energy_plan.cheapness_quarter[3]
-      );
-    }
-
-    const char* solar_pos = strstr(This->get_res_buf(), "\"solar\":");
-    if (solar_pos != nullptr) {
-      sscanf(solar_pos, "\"solar\":[%d,%d,%d,%d", 
-        &UiD.leop_data.energy_plan.solar_quarter[0], 
-        &UiD.leop_data.energy_plan.solar_quarter[1], 
-        &UiD.leop_data.energy_plan.solar_quarter[2], 
-        &UiD.leop_data.energy_plan.solar_quarter[3]
-      );
-    }
-
-    UiD.type = UI_LEOP_DATA;
-
-    // --- Send new parsed data to UI Queue
-
-    ESP_LOGI(TAG, "Sending LEOP to queue.");
-
-    UiQueue::send(UiD);
-    }
-
-    if (This->gptimer_enabled_) // Wait for GPTIMER signal
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY); 
-    else // Fallback to regular delay if timer failed to start is is still starting up
-      vTaskDelay(pdMS_TO_TICKS(This->timer_interval_ms_)); 
   }
 }
-

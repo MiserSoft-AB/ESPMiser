@@ -1,4 +1,4 @@
 idf_component_register(
-  SRCS "ui_queue.cpp"
+  SRCS "data_queue.cpp"
   INCLUDE_DIRS "."
 )
