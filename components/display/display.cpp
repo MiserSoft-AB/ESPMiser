@@ -167,10 +167,13 @@ esp_err_t Display::backlight_set(uint8_t value)
   return err;
 }
 
+
 esp_err_t Display::touch_init()
 {
   if (!board_i2c_master_is_ready()) 
     return ESP_ERR_INVALID_STATE;
+
+  esp_err_t ret;
 
   // Configure GPIO
   const gpio_config_t io_conf = {
@@ -181,14 +184,14 @@ esp_err_t Display::touch_init()
     .intr_type = GPIO_INTR_DISABLE,
   };
 
-  esp_err_t ret = gpio_config(&io_conf);
+  ret = gpio_config(&io_conf);
   if (ret != ESP_OK) 
   {
     ESP_LOGE(TAG, "Failed to configure touch reset GPIO %d: %s",
              (int)LCD_TOUCH_RESET_IO, esp_err_to_name(ret));
     return ret;
   }
-  
+
   ESP_LOGD(TAG, "Initializing backlight");
   /* The backlight must be initialized and the GT911 reset sequence
    * must run before the GT911 driver is created. */
@@ -201,58 +204,75 @@ esp_err_t Display::touch_init()
   if (ret != ESP_OK) 
     return ret;
   
+  /* OK should be more robust now.
+   * There are two addresses that change depending on if RST is low/high 
+   * So we probe both to make sure we get the correct one at init */
+  const uint8_t touch_addrs[] = {I2C_ADDR_GT911_SECONDARY, I2C_ADDR_GT911_PRIMARY};
 
-  tp_io_cfg_ = {
-    .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
-    .control_phase_bytes = 1,
-    .dc_bit_offset = 0,
-    .lcd_cmd_bits = 16,
-    .flags = {
-      .disable_control_phase = 1,
-    },
-    /* CHANGED: the new esp_lcd I2C implementation requires an explicit SCL
-     * frequency; use 100 kHz for reliable GT911 communication. */
-    .scl_speed_hz = 100000,
-  };
-
-  ret = esp_lcd_new_panel_io_i2c(
-    board_i2c_master_bus_get(),
-    &tp_io_cfg_,
-    &tp_io_handle_);
-
-  if (ret != ESP_OK) 
+  for (uint8_t addr : touch_addrs)
   {
-    ESP_LOGE(TAG, "Failed to create new i2c handle for touch panel: %s",
-             esp_err_to_name(ret));
-    return ret;
+    tp_io_cfg_ = {
+      .dev_addr = addr,
+      .control_phase_bytes = 1,
+      .dc_bit_offset = 0,
+      .lcd_cmd_bits = 16,
+      .flags = {
+        .disable_control_phase = 1,
+      },
+      .scl_speed_hz = I2C_MASTER_FREQ_HZ,
+    };
+
+    ret = esp_lcd_new_panel_io_i2c(
+      board_i2c_master_bus_get(),
+      &tp_io_cfg_,
+      &tp_io_handle_);
+
+    if (ret != ESP_OK) {
+      ESP_LOGD(TAG, "GT911 panel IO not created at 0x%02X: %s",
+               addr, esp_err_to_name(ret));
+      continue;
+    }
+
+    esp_lcd_touch_io_gt911_config_t tp_gt911_config = {
+      .dev_addr = addr,
+    };
+
+    const esp_lcd_touch_config_t tp_cfg = {
+      .x_max = LCD_H_RES,
+      .y_max = LCD_V_RES,
+      .rst_gpio_num = (gpio_num_t)LCD_TOUCH_PIN_NUM_RST,
+      .int_gpio_num = (gpio_num_t)LCD_TOUCH_PIN_NUM_INT,
+      .levels = {
+        .reset = 0,
+        .interrupt = 0,
+      },
+      .flags = {
+        .swap_xy = 0,
+        .mirror_x = 0,
+        .mirror_y = 0,
+      },
+      .driver_data = &tp_gt911_config,
+    };
+
+    ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle_, &tp_cfg, &tp_handle_);
+    if (ret == ESP_OK && tp_handle_ != nullptr) {
+      ESP_LOGI(TAG, "GT911 found at I2C address 0x%02X", addr);
+      break; // We found it
+    }
+
+    ESP_LOGD(TAG, "GT911 not usable at 0x%02X: %s",
+             addr, esp_err_to_name(ret));
+
+    // Do not leave a stale panel-io handle behind.
+    if (tp_io_handle_ != nullptr) {
+      esp_lcd_panel_io_del(tp_io_handle_);
+      tp_io_handle_ = nullptr;
+    }
   }
 
-  esp_lcd_touch_io_gt911_config_t tp_gt911_config = {
-    .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS,
-  };
-
-  const esp_lcd_touch_config_t tp_cfg = {
-    .x_max = LCD_H_RES,
-    .y_max = LCD_V_RES,
-    .rst_gpio_num = (gpio_num_t)-1,
-    .int_gpio_num = (gpio_num_t)-1,
-    .levels = {
-      .reset = 0,
-      .interrupt = 0,
-    },
-    .flags = {
-      .swap_xy = 0,
-      .mirror_x = 0,
-      .mirror_y = 0,
-    },
-    .driver_data = &tp_gt911_config,
-  };
-
-  ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle_, &tp_cfg, &tp_handle_);
-  if (ret != ESP_OK) 
-  {
-    ESP_LOGE(TAG, "Failed to create GT911 driver: %s", esp_err_to_name(ret));
-    return ret;
+  if (tp_handle_ == nullptr) {
+    ESP_LOGE(TAG, "GT911 not found at either address");
+    return ESP_ERR_NOT_FOUND;
   }
 
   return ESP_OK;
