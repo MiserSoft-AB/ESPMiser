@@ -24,7 +24,7 @@
 static const char* TAG = "esp_miser";
 
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
-static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
+static const size_t LEOP_FETCH_INTERVAL_MS = CONFIG_LEOP_DATA_RETRIEVAL_FREQUENCY * 60 * 1000; // How often LEOP gptimer triggers
 
 // static Display       g_Display;
 static Ui            g_Ui;
@@ -39,9 +39,9 @@ extern "C" void app_main(void)
   BaseType_t task_result;
 
   // Initialize PSRAM
+  ESP_LOGI(TAG, "Checking for PSRAM...");
   ESP_ERROR_CHECK(esp_psram_init());
-  if (!esp_psram_is_initialized()) 
-    ESP_LOGW(TAG, "PSRAM not found.\n");
+  ESP_LOGI(TAG, "PSRAM detected!");
 
   // Start watchdog task
   res = MiserSysMon::start();
@@ -51,7 +51,7 @@ extern "C" void app_main(void)
   // Init NVS flash
   esp_err_t flash_res = nvs_flash_init();
   ESP_ERROR_CHECK(flash_res);
-  if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || ESP_ERR_NVS_NEW_VERSION_FOUND) {
+  if (flash_res == ESP_ERR_NVS_NO_FREE_PAGES || flash_res == ESP_ERR_NVS_NEW_VERSION_FOUND) {
     nvs_flash_erase();
     nvs_flash_init(); // huh? hail mary?
   }
@@ -104,6 +104,12 @@ extern "C" void app_main(void)
   if (task_result != pdPASS)
     ESP_LOGE(TAG, "Failed to create ui task");
 
+
+  // Register LEOP gptimer
+  if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // Configurable from menuconfig
+    ESP_LOGE(TAG, "Failed to setup leop task gptimer");
+
+
   // Start leop fetcher task for spots/calcs
   task_result = xTaskCreate(
     LeopFetcher::leop_fetch_task,
@@ -116,9 +122,7 @@ extern "C" void app_main(void)
   if (task_result != pdPASS) //pdPASS = task created successfully
     ESP_LOGE(TAG, "Failed to create leoppp task");
 
-  // Register gptimer
-  if (g_Lf.setup_gptimer(LEOP_FETCH_INTERVAL_MS) != ESP_OK) // each 15 mins now
-    ESP_LOGE(TAG, "Failed to setup leop task gptimer");
+  
 
   // Setup Sensors timer
   if (g_S.timer_setup(500) == ESP_OK) 

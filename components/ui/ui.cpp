@@ -107,7 +107,7 @@ void Ui::update(const DataQueue::Data& Qd)
   }
 
   if (label_price_) {
-    lv_snprintf(buf, sizeof(buf), "Price: %.2f kr", Qd.leop.price);
+    lv_snprintf(buf, sizeof(buf), "Price: %.2f kr", Qd.leop.energy_plan.price[0]);
     lv_label_set_text(label_price_, buf);
   }
 
@@ -210,12 +210,12 @@ void Ui::ui_task(void* param)
     {
       This->update(This->Qd_);
 
-      ESP_LOGI(TAG, "UI data updated! price: %f temp: %f, humidity: %f, press: %f.", 
-        This->Qd_.leop.price,
-        This->Qd_.sensor.temperature,
-        This->Qd_.sensor.pressure,
-        This->Qd_.sensor.humidity
-      );
+      // ESP_LOGI(TAG, "UI data updated! price: %f temp: %f, humidity: %f, press: %f.", 
+      //   This->Qd.leop.energy_plan.price[0],
+      //   This->Qd_.sensor.temperature,
+      //   This->Qd_.sensor.pressure,
+      //   This->Qd_.sensor.humidity
+      // );
     }
     else
       ESP_LOGW(TAG, "Didn't update queue data");
