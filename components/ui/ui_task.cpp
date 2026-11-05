@@ -18,6 +18,8 @@ void Ui::ui_task(void* param) {
     if (DataQueue::get(&Qd, pdMS_TO_TICKS(100)) == 0) 
       // Might just want to use software timer and pass zero timeout to queue for a try-lock
     {
+     
+      
       
       // ESP_LOGI(TAG, "UI data updated! price: %f temp: %f, humidity: %f, press: %f.", 
       //   Qd.leop.price,
@@ -29,7 +31,7 @@ void Ui::ui_task(void* param) {
     else
       ESP_LOGW(TAG, "Failed to get data from queue");
     
-    // vTaskDelay(100);
+    vTaskDelay(100);
   }
 }
 

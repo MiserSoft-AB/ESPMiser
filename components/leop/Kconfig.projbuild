@@ -3,7 +3,7 @@ menu "LEOP Server"
     config LEOP_SERVER_URL
         string "LEOP_SERVER_URL"
         help
-            URL where leop server API can be reached.
+            URL where leop server API can be reached. (Raw IP addresses need the http:// prefix to work properly.)
 
     config LEOP_SERVER_PORT
         string "LEOP_SERVER_PORT"
@@ -15,5 +15,11 @@ menu "LEOP Server"
         help
             Name of facility on the LEOP server where data should be fetched from.
 
+    config LEOP_DATA_RETRIEVAL_FREQUENCY
+        int "LEOP_DATA_RETRIEVAL_FREQUENCY"
+        range 1 60
+        default 15
+        help
+            How often the LEOP-data should get fetched in minutes.
 
 endmenu
