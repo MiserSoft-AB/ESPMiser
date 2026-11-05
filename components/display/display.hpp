@@ -9,7 +9,7 @@
 #include <esp_lcd_panel_ops.h>
 #include <esp_lcd_panel_rgb.h>
 #include <esp_lcd_panel_io.h>
-#include <lvgl.h>
+#include <esp_lv_adapter.h>
 
 #define BACKLIGHT_MASK ((uint8_t)(1U << 2))
 
@@ -30,17 +30,19 @@ class Display
 
     // Set backlight level (CH422G PWM duty cycle)
     // 0: off, 100: full brightness
+    // TODO: Repair, it is now broken after init since switching to two-byte reg transmit
     esp_err_t backlight_set(uint8_t percent);
 
     // Is display inited?
     bool is_ready() { return ready_; }
 
   private:
+    // Main rgb panel handle
     esp_lcd_panel_handle_t  rgb_handle_ = nullptr;
 
     // CH422G LED driver
-    i2c_master_dev_handle_t bl_cfg_dev_ = nullptr;
-    i2c_master_dev_handle_t bl_out_dev_ = nullptr;
+    // i2c_master_dev_handle_t bl_cfg_dev_ = nullptr;
+    i2c_master_dev_handle_t bl_dev_ = nullptr;
 
     // esp_lcd_panel_io_handle_t     bl_io_handle_ = nullptr;
     // We need a seperate handle for ch422g config on addr 0x24
@@ -54,11 +56,16 @@ class Display
     esp_lcd_panel_io_handle_t     tp_io_handle_ = nullptr;
     esp_lcd_panel_io_i2c_config_t tp_io_cfg_{};
 
+    // LVGL display
+    lv_display_t* lv_disp_  = nullptr;
+    lv_indev_t*   lv_touch_ = nullptr;
+
+    // Internal functions
     esp_err_t rgb_init();
     esp_err_t touch_init();
     esp_err_t touch_reset();
     esp_err_t backlight_init();
-    // esp_err_t lvgl_init();
+    esp_err_t lvgl_init();
 
     bool ready_ = false;
 };

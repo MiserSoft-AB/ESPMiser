@@ -2,6 +2,8 @@
 #include "esp_err.h"
 
 
+/*** I2C ***/
+
 // Legacy i2c_bus, worked awfully for display, refactor legacy libs instead
 #ifdef I2C_LEGACY_BUS_ENABLED
 
@@ -77,7 +79,6 @@ esp_err_t board_i2c_master_init()
     },
   };
 
-
   ret = i2c_new_master_bus(&bus_cfg, & g_i2c_bus);
 
   if (ret == ESP_OK)
@@ -95,6 +96,23 @@ i2c_master_bus_handle_t board_i2c_master_bus_get()
   else
     return nullptr;
 }
+
+/*** PSRAM ***/
+
+// static bool g_psram_enabled = false;
+//
+// esp_err_t board_psram_enable() { return g_i2c_ready; }
+//
+// esp_err_t board_psram_init() 
+// { 
+//   ESP_ERROR_CHECK(esp_psram_init());
+//   if (!esp_psram_is_initialized()) 
+//     ESP_LOGW(TAG, "PSRAM not found.\n");
+//
+//   g_psram_enabled = true;
+//
+//   return err;
+// }
 
 #endif // I2C_LEGACY_BUS_ENABLED
 

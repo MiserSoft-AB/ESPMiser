@@ -124,11 +124,10 @@ void Ui::ui_task(void* param)
     else
       ESP_LOGW(TAG, "Didn't update queue data");
     
-    if (ui_buffer.refresh_count % 2 == 0) 
-      This->display_.backlight_set(0x00);
-    else 
-      This->display_.backlight_set(BACKLIGHT_MASK);
-
+    // if (ui_buffer.refresh_count % 2 == 0) 
+    //   This->display_.backlight_set(0);
+    // else 
+    //   This->display_.backlight_set(255);
 
     ui_buffer.refresh_count++;
 
