@@ -7,6 +7,7 @@
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
 #include "uart_interface.hpp"
+#include "board_config.h"
 
 #include <esp_psram.h>
 #include <portmacro.h>
@@ -20,14 +21,12 @@
 
 #include <esp_partition.h>
 
-// #include "board_config.h"
-// #include <driver/i2c.h>
-
 static const char* TAG = "esp_miser";
 
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
 static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
 
+static Display       g_Display;
 static WifiHandler   g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
 static LeopFetcher   g_Lf(LEOP_RESPONSE_BUF_SIZE);
 static Sensors       g_S;
@@ -68,17 +67,26 @@ extern "C" void app_main(void)
   if (DataQueue::init() > 0)
     ESP_LOGE(TAG, "Failed creating data queue, tasks that depend on it will fail");
 
-  // Start display (maybe make part of ui init or keep separate?)
-  task_result = xTaskCreate( 
-    display_task,
-    "display_task",
-    4096,
-    nullptr,
-    task_priorities::DISPLAY,
-    nullptr
-  );
-  if (task_result != pdPASS)
-    ESP_LOGE(TAG, "Failed to create display task");
+  // Init global i2c master
+  if (board_i2c_master_init() != ESP_OK)
+    ESP_LOGE(TAG, "Failed to init global i2c master, tasks that depend on it will fail");
+
+  if (g_Display.init() != ESP_OK)
+    ESP_LOGE(TAG, "Display init failed");
+  else
+  {
+    // Start display (maybe make part of ui init or keep separate?)
+    task_result = xTaskCreate( 
+      display_task,
+      "display_task",
+      4096,
+      &g_Display,
+      task_priorities::DISPLAY,
+      nullptr
+    );
+    if (task_result != pdPASS)
+      ESP_LOGE(TAG, "Failed to create display task");
+  }
 
   // Start UI
   task_result = xTaskCreate(
