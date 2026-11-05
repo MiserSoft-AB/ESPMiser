@@ -46,8 +46,12 @@ bool board_i2c_master_is_ready();
 #define I2C_ADDR_BME280          0x77 // sensors
 #define I2C_ADDR_GT911_PRIMARY   0x5D // touch panel
 #define I2C_ADDR_GT911_SECONDARY 0x14 // touch panel
-#define I2C_ADDR_CH422G_CFG      0x24 // backlight LED config
-#define I2C_ADDR_CH422G          0x38 // backlight LED main driver
+#define I2C_ADDR_CH422G          0x24 // backlight LED config
+
+// #define I2C_ADDR_CH422G          0x38 // backlight LED main driver
+#define CH422G_OUT 0x03
+#define CH422G_IN  0x04
+#define CH422G_PWM 0x05
 
 /*------------------- LCD Config --------------------*/
 
@@ -99,6 +103,12 @@ bool board_i2c_master_is_ready();
 #define LCD_TOUCH_PIN_NUM_RST -1
 #define LCD_TOUCH_PIN_NUM_INT -1
 
+#define LCD_HSYNC_PULSE_WIDTH 162
+#define LCD_HSYNC_BACK_PORCH 152
+#define LCD_HSYNC_FRONT_PORCH 48
+#define LCD_VSYNC_PULSE_WIDTH 45
+#define LCD_VSYNC_BACK_PORCH 13
+#define LCD_VSYNC_FRONT_PORCH 3
 
 #ifdef __cplusplus
 } // extern "C"

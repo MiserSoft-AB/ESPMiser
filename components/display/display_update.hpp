@@ -2,6 +2,4 @@
 
 #include "display_hal.hpp"
 
-#include <cstdint>
-
-esp_err_t update_display_backlight(IDisplay& display, std::uint32_t frame);
+esp_err_t initialize_display(IDisplay& display);

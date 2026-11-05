@@ -4,6 +4,7 @@
 /* Common data structure lib for ESPMiser 
  * Meant for use in shared consumer-producer queues between components */
 
+#include <ctime>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -87,9 +88,37 @@ typedef struct
 
 typedef struct 
 {
-  float    price;
+  time_t timestamp;
 
-} Leop_Data; // Replace with actual struct from shared lib
+  float temperature;
+  float precipitation;
+  float windspeed;
+
+  int radiation_shortwave;
+
+} Weather_Sample; // Weather state at specified timestamp
+
+typedef struct {
+  // POSSIBLE CHEAPNESS VALUES:
+  //   1 = BUY
+  //   0 = STORE
+  //  -1 = SELL
+  
+  time_t timestamp;
+
+  int price[4];
+  int cheapness_quarter[4];
+  int solar_quarter[4];
+  // int consumption_quarter[4]; // Does not exist in the api response without a separate endpoint call and connected P1 meter?
+
+} Hourly_Energy_Plan; // Energy plan is recieved in increments of 15 min from the LEOP server. Value of 4 = store 1hr forecast.
+
+typedef struct 
+{
+  Weather_Sample      weather_forecast[24];
+  Hourly_Energy_Plan  energy_plan;
+
+} Leop_Data; // Data from LEOP server
 
 typedef struct 
 {
@@ -126,7 +155,7 @@ static void data_leop_init(Leop_Data* LeD)
     return;
 
   *LeD = { 
-    .price = 0.0,
+
   };
 }
 

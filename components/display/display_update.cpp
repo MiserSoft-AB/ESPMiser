@@ -1,7 +1,11 @@
 #include "display_update.hpp"
 
-esp_err_t update_display_backlight(IDisplay& display, std::uint32_t frame)
+esp_err_t initialize_display(IDisplay& display)
 {
-    const bool enabled = frame % 2 != 0;
-    return display.set_backlight(enabled);
+    if (display.is_ready())
+    {
+        return ESP_OK;
+    }
+
+    return display.init();
 }

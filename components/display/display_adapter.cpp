@@ -19,3 +19,8 @@ esp_err_t DisplayAdapter::set_backlight(bool enabled)
 
     return display_.backlight_set(enabled ? backlight_on : backlight_off);
 }
+
+lv_display_t* DisplayAdapter::lv_disp_get()
+{
+    return display_.lv_disp_get();
+}

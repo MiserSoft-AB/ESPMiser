@@ -30,18 +30,33 @@ private:
 class FakeDisplay final : public IDisplay
 {
 public:
-    esp_err_t init() override { return ESP_OK; }
-    bool is_ready() override { return true; }
-
-    esp_err_t set_backlight(bool enabled) override
+    explicit FakeDisplay(esp_err_t init_result = ESP_OK)
+        : init_result_(init_result)
     {
-        backlight_enabled = enabled;
-        ++backlight_calls;
+    }
+
+    esp_err_t init() override
+    {
+        ++init_calls;
+        ready_ = init_result_ == ESP_OK;
+        return init_result_;
+    }
+
+    bool is_ready() override
+    {
+        return ready_;
+    }
+
+    esp_err_t set_backlight(bool) override
+    {
         return ESP_OK;
     }
 
-    bool backlight_enabled = false;
-    unsigned int backlight_calls = 0;
+    unsigned int init_calls = 0;
+
+private:
+    esp_err_t init_result_;
+    bool ready_ = false;
 };
 
 void test_sensor_update()
@@ -62,28 +77,31 @@ void test_sensor_update()
     assert(!failure.should_publish(true));
 }
 
-void test_display_backlight()
+void test_display_initialization()
 {
     FakeDisplay display;
-    constexpr bool expected_states[] = { false, true, false };
-    std::uint32_t frame = 0;
 
-    for (const bool expected : expected_states)
-    {
-        const auto result = update_display_backlight(display, frame);
+    const auto first_result = initialize_display(display);
+    assert(first_result == ESP_OK);
+    assert(display.is_ready());
+    assert(display.init_calls == 1);
 
-        assert(result == ESP_OK);
-        assert(display.backlight_calls == frame + 1);
-        assert(display.backlight_enabled == expected);
+    const auto second_result = initialize_display(display);
+    assert(second_result == ESP_OK);
+    assert(display.init_calls == 1);
 
-        ++frame;
-    }
+    FakeDisplay failing_display{ESP_FAIL};
+
+    const auto failure_result = initialize_display(failing_display);
+    assert(failure_result == ESP_FAIL);
+    assert(!failing_display.is_ready());
+    assert(failing_display.init_calls == 1);
 }
 
 int main()
 {
     test_sensor_update();
-    test_display_backlight();
+    test_display_initialization();
 
     std::puts("sensor and display tests passed");
     return 0;

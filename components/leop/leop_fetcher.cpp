@@ -8,6 +8,7 @@
 
 #include "http_client.hpp"
 
+#include <cstdio>
 #include <time.h> // for rand might remove
 
 // --------------------- Privates -------------------------
@@ -175,6 +176,8 @@ void LeopFetcher::leop_fetch_task(void* param)
     return;
   }
 
+  This->task_handle_ = xTaskGetCurrentTaskHandle();
+
   // Define URL to LEOP server
   size_t url_len = snprintf(url, 256, "%s:%s/%s%s", 
     CONFIG_LEOP_SERVER_URL, 
@@ -236,17 +239,48 @@ void LeopFetcher::leop_fetch_task(void* param)
     {
       ESP_LOGI(TAG, "LEOP Response len:\n %zu", This->get_res_buf_len());
       ESP_LOGI(TAG, "LEOP Response:\n %s", This->get_res_buf());
+    
+      const char* start_pos = strstr(This->get_res_buf(), "\"start\":");
+      if (start_pos != nullptr) {
+        sscanf(start_pos, "\"start\":%lld", &Qd.leop.energy_plan.timestamp);
+      }
+
+      const char* prices_pos = strstr(This->get_res_buf(), "\"prices\":");
+      if (prices_pos != nullptr) {
+        sscanf(prices_pos, "\"prices\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.price[0], 
+          &Qd.leop.energy_plan.price[1], 
+          &Qd.leop.energy_plan.price[2], 
+          &Qd.leop.energy_plan.price[3]
+        );
+      }
+
+      const char* cheapness_pos = strstr(This->get_res_buf(), "\"cheapness\":");
+      if (cheapness_pos != nullptr) {
+        sscanf(cheapness_pos, "\"cheapness\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.cheapness_quarter[0], 
+          &Qd.leop.energy_plan.cheapness_quarter[1], 
+          &Qd.leop.energy_plan.cheapness_quarter[2], 
+          &Qd.leop.energy_plan.cheapness_quarter[3]
+        );
+      }
+
+      const char* solar_pos = strstr(This->get_res_buf(), "\"solar\":");
+      if (solar_pos != nullptr) {
+        sscanf(solar_pos, "\"solar\":[%d,%d,%d,%d", 
+          &Qd.leop.energy_plan.solar_quarter[0], 
+          &Qd.leop.energy_plan.solar_quarter[1], 
+          &Qd.leop.energy_plan.solar_quarter[2], 
+          &Qd.leop.energy_plan.solar_quarter[3]
+        );
+      }
+
+      // --- Send new parsed data to UI Queue
+
+      ESP_LOGI(TAG, "Sending LEOP to queue.");
+
+      DataQueue::send(Qd);
     }
-
-    // --- Send new parsed data to UI Queue
-    // Mock sending data over queue to ui
-    srand(time(NULL));
-    Qd.leop.price = (float)rand() / RAND_MAX;
-    ESP_LOGI(TAG, "Sending %f to queue.", Qd.leop.price);
-
-    // Send to consumer queues
-    DataQueue::send(Qd);
-    // UartQueue::send(UiD);
 
     // The network task completed another iteration
     res = esp_task_wdt_reset();
