@@ -77,3 +77,4 @@ sdkconfig.old
 
 # espressif stuff
 managed_components/
+dependencies.lock
