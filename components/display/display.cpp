@@ -1,4 +1,6 @@
 #include "display.hpp"
+#include "display_hal.hpp"
+#include "display_update.hpp"
 #include "board_config.h"
 
 #include <cstdint>
@@ -10,7 +12,6 @@
 #include "freertos/timers.h"
 #include "portmacro.h"
 
-#define BACKLIGHT_MASK ((uint8_t)(1U << 2))
 
 namespace 
 {
@@ -360,7 +361,7 @@ esp_err_t Display::init()
 
 void display_task(void* parameter)
 {
-    Display* Disp = (Display*)parameter;
+    IDisplay* Disp = static_cast<IDisplay*>(parameter);
     if (!Disp || !Disp->is_ready())
     {
         ESP_LOGE(TAG, "Display is not inited or not passed as task parameter");
@@ -410,10 +411,7 @@ void display_task(void* parameter)
         // Just switch backlight on/off for test
         // TODO: Replace with UI update, or move all this to UI and let that handle it
         // Or have a queue recieve from UI to update
-        if (display_buffer.refresh_count % 2 == 0) 
-            Disp->backlight_set(0x00);
-        else 
-            Disp->backlight_set(BACKLIGHT_MASK);
+        update_display_backlight(*Disp, display_buffer.refresh_count);
         
 
         display_buffer.refresh_count++;

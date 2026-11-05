@@ -2,10 +2,12 @@
 #include "task_priorities.hpp"
 #include "sysmon_task.hpp"
 #include "display.hpp"
+#include "display_adapter.hpp"
 #include "data_queue.hpp"
 #include "ui_task.hpp"
 #include "leop_fetcher.hpp"
 #include "sensors_task.hpp"
+#include "bme280_adapter.hpp"
 #include "uart_interface.hpp"
 #include "board_config.h"
 
@@ -26,11 +28,12 @@ static const char* TAG = "esp_miser";
 static constexpr size_t LEOP_RESPONSE_BUF_SIZE = 1024 * 64;      // Size of PSRAM buffer
 static constexpr size_t LEOP_FETCH_INTERVAL_MS = 15 * 60 * 1000; // How often gptimer triggers
 
-static Display       g_Display;
-static WifiHandler   g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());  
-static LeopFetcher   g_Lf(LEOP_RESPONSE_BUF_SIZE);
-static Sensors       g_S;
-static UartInterface g_UaIf(nullptr);
+static DisplayAdapter  g_Display;
+static WifiHandler     g_wifihandler(WIFI_INIT_CONFIG_DEFAULT());
+static LeopFetcher     g_Lf(LEOP_RESPONSE_BUF_SIZE);
+static Bme280Adapter   g_sensor;
+static Sensors         g_S{g_sensor};
+static UartInterface   g_UaIf(nullptr);
 
 extern "C" void app_main(void)
 {
@@ -80,7 +83,7 @@ extern "C" void app_main(void)
       display_task,
       "display_task",
       4096,
-      &g_Display,
+      static_cast<IDisplay*>(&g_Display),
       task_priorities::DISPLAY,
       nullptr
     );
